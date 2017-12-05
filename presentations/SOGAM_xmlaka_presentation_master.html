@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Path tracing</title>
+<meta name="author" content="(Jozef Mláka)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="./css/reveal.css"/>
+
+<link rel="stylesheet" href="./css/theme/black.css" id="theme"/>
+
+<link rel="stylesheet" href="./css/custom.css"/>
+<link rel="stylesheet" href="./lib/css/zenburn.css"/>
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = './css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide" data-background="./img/intro.jpg"><h1>Path tracing</h1>
+ <h3>Jozef Mláka</h3>
+ <h4><a href="mailto:x.jozef.mlaka@gmail.com">x.jozef.mlaka@gmail.com</a></h4>
+</section>
+
+<section>
+<section id="slide-org583295b" class="headline_hidden">
+<h2 id="org583295b">Which one is real?&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+<table border="0" cellspacing="0" cellpadding="6" rules="none" frame="hsides" width="60%">
+
+
+<colgroup>
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left"><img src="img/hyperion_pt.jpg" alt="hyperion_pt.jpg" /></td>
+</tr>
+
+<tr>
+<td class="org-left"><img src="img/hyperion_real.jpg" alt="hyperion_real.jpg" /></td>
+</tr>
+</tbody>
+</table>
+
+
+</section>
+</section>
+<section>
+<section id="slide-org9d01910" data-background="./img/_01.png" class="headline_hidden">
+<h2 id="org9d01910">How light works&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+</section>
+<section id="slide-org0d7f1f1" data-background="./img/_02.png" class="headline_hidden">
+<h3 id="org0d7f1f1">1</h3>
+
+</section>
+<section id="slide-orged68a00" data-background="./img/_03.png" class="headline_hidden">
+<h3 id="orged68a00">2</h3>
+
+</section>
+<section id="slide-orgb9c53fd" data-background="./img/_04.png" class="headline_hidden">
+<h3 id="orgb9c53fd">3</h3>
+
+</section>
+<section id="slide-org5ad6817" data-background="./img/_05.png" class="headline_hidden">
+<h3 id="org5ad6817">4</h3>
+
+</section>
+<section id="slide-orgd89adcc" data-background="./img/_06.png" class="headline_hidden">
+<h3 id="orgd89adcc">5</h3>
+</section>
+</section>
+<section>
+<section id="slide-org0d2bdf1" class="headline_hidden">
+<h2 id="org0d2bdf1">Ray tracing&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+
+<div class="figure">
+<p><img src="img/ray_trace_diagram.png" alt="ray_trace_diagram.png" />
+</p>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-orgdc494f7" class="headline_hidden">
+<h2 id="orgdc494f7">Path tracing vs ray tracing&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+
+<div class="figure">
+<p><img src="img/Local_illumination.JPG" alt="Local_illumination.JPG" />
+</p>
+</div>
+
+</section>
+<section id="slide-orgc0d7cf2" class="headline_hidden">
+<h3 id="orgc0d7cf2">Path tracing</h3>
+
+<div class="figure">
+<p><img src="img/Global_illumination.JPG" alt="Global_illumination.JPG" />
+</p>
+</div>
+
+</section>
+<section id="slide-org5dd8c9a" class="headline_hidden">
+<h3 id="org5dd8c9a">Both&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h3>
+
+<div class="figure">
+<p><img src="img/ray_vs_path.png" alt="ray_vs_path.png" />
+</p>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-org8ff0938" class="headline_hidden">
+<h2 id="org8ff0938">Depth of field&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+
+<div class="figure">
+<p><img src="img/dof.jpg" alt="dof.jpg" />
+</p>
+</div>
+</section>
+<section id="slide-orgb1c8a38" data-background="./img/fstop.jpg" class="headline_hidden">
+<h3 id="orgb1c8a38">Depth of field&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h3>
+
+</section>
+</section>
+<section>
+<section id="slide-orgb74daa5" data-background="./img/caustics.jpg" class="headline_hidden">
+<h2 id="orgb74daa5">Caustics&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+
+</section>
+</section>
+<section>
+<section id="slide-org221009f" class="headline_hidden">
+<h2 id="org221009f">Soft shadows&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+
+<div class="figure">
+<p><img src="img/soft_shadow.png" alt="soft_shadow.png" />
+</p>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-org5f43f3f" data-background="./img/pt1.png" class="headline_hidden">
+<h2 id="org5f43f3f">Takes really long time&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h2>
+</section>
+<section id="slide-org2cd8e13" data-background="./img/pt2.png" class="headline_hidden">
+<h3 id="org2cd8e13">Takes really long time&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h3>
+
+</section>
+<section id="slide-org48e160b" data-background="./img/pt3.png" class="headline_hidden">
+<h3 id="org48e160b">Takes really long time&#xa0;&#xa0;&#xa0;<span class="tag"><span class="hidden">hidden</span></span></h3>
+
+</section>
+</section>
+<section>
+<section id="slide-orga395e1d" data-background="./img/end.jpg" class="black">
+<h2 id="orga395e1d">Thanks!</h2>
+
+
+</section>
+</section>
+<section>
+<section id="slide-orgc7027b1" class="small-text">
+<h2 id="orgc7027b1">Sources</h2>
+<ul>
+<li>Disney's guide to pathtracing <a href="https://www.youtube.com/watch?v=frLwRLS_ZR0">https://www.youtube.com/watch?v=frLwRLS_ZR0</a></li>
+<li>Ray Tracing / Subsurface Scattering @ Function 2015 <a href="https://www.youtube.com/watch?v=qyDUvatu5M8">https://www.youtube.com/watch?v=qyDUvatu5M8</a></li>
+<li>Rendering techniques comparison <a href="http://www.winosi.onlinehome.de/Gallery_t14_11.htm">http://www.winosi.onlinehome.de/Gallery_t14_11.htm</a></li>
+<li>Cornell box comparison <a href="https://www.graphics.cornell.edu/online/box/compare.html">https://www.graphics.cornell.edu/online/box/compare.html</a></li>
+<li>Depth of field article <a href="http://cg.skeelogy.com/depth-of-field-using-raytracing/">http://cg.skeelogy.com/depth-of-field-using-raytracing/</a></li>
+<li>Soft shadows image <a href="http://www.assignmentpoint.com/science/computer/real-time-soft-shadow-rendering.html">http://www.assignmentpoint.com/science/computer/real-time-soft-shadow-rendering.html</a></li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="./lib/js/head.min.js"></script>
+<script src="./js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+overview: true,
+margin: 0.00,
+minScale: 0.50,
+maxScale: 2.00,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'fade', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+multiplex: {
+    secret: '13983332f1f641c2', // null if client
+    id: 'c4326a92b640c6ea', // id, obtained from socket.io server
+    url: 'https://nodejs-multiplex.a3c1.starter-us-west-1.openshiftapps.com' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js', async: true },
+ { src: './plugin/multiplex/master.js', async: true },
+ { src: './plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+ { src: './plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: './plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+]
+});
+</script>
+</body>
+</html>
