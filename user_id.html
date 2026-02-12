@@ -128,6 +128,14 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
+        input.valid {
+            border-color: #22c55e;
+        }
+
+        input.invalid {
+            border-color: #ef4444;
+        }
+
         input::placeholder {
             color: var(--text-tertiary);
         }
@@ -336,6 +344,17 @@
             font-size: 0.8rem;
         }
 
+        .security-review a {
+            color: #60a5fa;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .security-review a:hover {
+            color: #93c5fd;
+            text-decoration: underline;
+        }
+
         .footer {
             margin-top: 24px;
             text-align: center;
@@ -421,7 +440,7 @@
             <div class="security-notice-title">Security & Privacy</div>
             <p><strong>All requests are made directly from your browser</strong> to EcoFlow's official API servers (<code>api.ecoflow.com</code>, <code>api-e.ecoflow.com</code>, <code>api-a.ecoflow.com</code>).</p>
             <p class="security-highlight">️<strong> Your credentials are NEVER sent to any third-party servers or stored anywhere</strong> - they go only to EcoFlow's official authentication endpoints. This page makes direct API calls from your browser.</p>
-            <p class="security-review">It is recommended you review the source code yourself (right-click → View Page Source) to verify this implementation.</p>
+            <p class="security-review">It is recommended you review the source code yourself (right-click → View Page Source or <a href="https://github.com/GnoX/gnox.github.io/blob/main/user_id.html#L481" target="_blank" rel="noopener noreferrer">view on GitHub</a>) to verify this implementation.</p>
         </div>
 
         <div class="footer">
@@ -524,6 +543,49 @@
             spinner.style.display = loading ? 'block' : 'none';
         }
 
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        // Real-time email validation
+        const emailInput = document.getElementById('email');
+        emailInput.addEventListener('input', () => {
+            const email = emailInput.value.trim();
+
+            // Remove previous validation classes
+            emailInput.classList.remove('valid', 'invalid');
+
+            // Only validate if there's input
+            if (email.length > 0) {
+                if (isValidEmail(email)) {
+                    emailInput.classList.add('valid');
+                } else {
+                    emailInput.classList.add('invalid');
+                }
+            }
+        });
+
+        // Prevent Enter key from moving to next field if email is invalid
+        emailInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const email = emailInput.value.trim();
+
+                if (!email) {
+                    showResult(false, '<p class="error-message">Please enter your email address</p>');
+                    return;
+                }
+
+                if (!isValidEmail(email)) {
+                    showResult(false, '<p class="error-message">Please enter a valid email address</p>');
+                    return;
+                }
+
+                document.getElementById('password').focus();
+            }
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -533,6 +595,11 @@
 
             if (!email || !password) {
                 showResult(false, '<p class="error-message">Please fill in all fields</p>');
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                showResult(false, '<p class="error-message">Please enter a valid email address</p>');
                 return;
             }
 
