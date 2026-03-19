@@ -1,0 +1,3369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoFlow BLE Debug</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --text: #e0e0e0;
+  --text-muted: #888;
+  --accent: #e94560;
+  --tx-color: #4da6ff;
+  --rx-color: #4dff88;
+  --border: #2a2a4a;
+  --mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+header h1 { font-size: 18px; color: var(--accent); }
+#status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  background: #333;
+  color: #888;
+}
+#status.connected { background: #1a3a1a; color: var(--rx-color); }
+#status.connecting { background: #3a3a1a; color: #ffcc00; }
+#status.error { background: #3a1a1a; color: var(--accent); }
+
+#connection-panel {
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  align-items: center;
+}
+#connection-panel input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+#connection-panel input::placeholder { color: var(--text-muted); }
+#connection-panel button {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text);
+  transition: background 0.2s;
+}
+#connection-panel button:hover { background: var(--accent); }
+#connection-panel button:disabled { opacity: 0.4; cursor: default; background: var(--surface2); }
+#connection-panel .hint {
+  border-color: var(--accent);
+  box-shadow: 0 0 6px rgba(233, 69, 96, 0.5);
+  animation: hint-pulse 1.5s ease-in-out 3;
+}
+
+#log-area {
+  padding: 8px 20px;
+  background: #111;
+  height: 120px;
+  min-height: 0;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+#log-area div { padding: 1px 0; }
+#log-area .log-error { color: var(--accent); }
+#log-area .log-success { color: var(--rx-color); }
+#log-area .log-info { color: var(--tx-color); }
+
+#main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+#packet-log {
+  flex: 1;
+  overflow: auto;
+  min-width: 0;
+}
+#packet-log table {
+  border-collapse: collapse;
+  font-size: 13px;
+  width: max-content;
+  min-width: 100%;
+}
+#packet-log thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: grab;
+  text-overflow: ellipsis;
+  position: relative;
+}
+#packet-log thead th .col-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+}
+#packet-log thead th .col-resize:hover,
+#packet-log thead th .col-resize.dragging {
+  background: var(--accent);
+}
+#packet-log tbody tr {
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+#packet-log tbody tr:hover { background: var(--surface2); }
+#packet-log tbody tr.selected { background: var(--surface2); }
+#packet-log tbody td {
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dir-tx { color: var(--tx-color); font-weight: bold; }
+.dir-rx { color: var(--rx-color); font-weight: bold; }
+
+.resize-handle-h {
+  width: 5px;
+  cursor: col-resize;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.resize-handle-h:hover, .resize-handle-h.dragging { background: var(--accent); }
+
+.resize-handle-v {
+  height: 5px;
+  cursor: row-resize;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.resize-handle-v:hover, .resize-handle-v.dragging { background: var(--accent); }
+
+#payload-detail {
+  width: 55%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+#payload-detail h3 {
+  padding: 8px 12px;
+  background: var(--surface);
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#payload-detail h3 button {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+#payload-detail h3 button + button { margin-left: 0; }
+#payload-detail h3 button:hover { background: var(--accent); color: var(--text); }
+#proto-bar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+#proto-bar select, #proto-bar button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 8px;
+  border-radius: 3px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+#proto-bar select.hint {
+  border-color: var(--accent);
+  box-shadow: 0 0 6px rgba(233, 69, 96, 0.5);
+  animation: hint-pulse 1.5s ease-in-out 3;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+#proto-bar button { cursor: pointer; border: none; background: var(--surface2); }
+#proto-bar button:hover { background: var(--accent); }
+#proto-bar label { color: var(--text-muted); }
+#proto-decoded {
+  overflow: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border-bottom: 1px solid var(--border);
+  max-height: 50%;
+  color: var(--text);
+}
+#proto-decoded:empty { display: none; }
+#proto-decoded .proto-msg-link {
+  color: var(--tx-color);
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+#proto-decoded .proto-msg-link:hover { color: var(--accent); }
+#proto-decoded .proto-key { color: var(--tx-color); }
+#proto-decoded .proto-val { color: var(--rx-color); }
+#proto-decoded .proto-err { color: var(--accent); }
+#custom-proto-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+#custom-proto-overlay.visible { display: flex; }
+#custom-proto-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+#custom-proto-modal h2 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+#custom-proto-modal textarea {
+  flex: 1;
+  min-height: 300px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  resize: vertical;
+}
+#custom-proto-modal .btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+#custom-proto-modal button {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text);
+}
+#custom-proto-modal button:hover { background: var(--accent); }
+#custom-proto-modal button.primary { background: var(--accent); }
+#custom-proto-error { color: var(--accent); font-size: 11px; margin-top: 8px; min-height: 14px; }
+
+/* Payload view tabs */
+#payload-tabs {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+#payload-tabs button {
+  padding: 6px 14px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+#payload-tabs button:hover { color: var(--text); }
+#payload-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+#payload-tabs button.hint {
+  color: var(--accent);
+  animation: hint-pulse 1.5s ease-in-out 3;
+}
+
+#view-packet, #view-timeline { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+#view-packet.active, #view-timeline.active { display: flex; }
+
+/* Timeline view */
+#timeline-controls {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+#timeline-controls button, #timeline-controls select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+#timeline-controls button { cursor: pointer; border: none; background: var(--surface2); }
+#timeline-controls button:hover { background: var(--accent); }
+#timeline-controls label { color: var(--text-muted); }
+#timeline-controls input[type="checkbox"] { margin-right: 3px; }
+#timeline-wrap {
+  flex: 1;
+  overflow: auto;
+}
+#timeline-wrap table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+#timeline-wrap thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+  cursor: pointer;
+}
+#timeline-wrap thead th:hover { color: var(--text); }
+#timeline-wrap thead th .col-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+}
+#timeline-wrap thead th .col-resize:hover,
+#timeline-wrap thead th .col-resize.dragging {
+  background: var(--accent);
+}
+#timeline-wrap tbody td {
+  padding: 3px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--border);
+}
+#timeline-wrap tbody td.changed {
+  background: #2a2a00;
+  color: #ffcc00;
+  font-weight: bold;
+}
+#timeline-wrap tbody tr:hover { background: var(--surface2); }
+#timeline-wrap tbody tr.selected { background: var(--surface2); }
+#tl-field-bar {
+  padding: 6px 12px;
+  background: var(--surface);
+  font-size: 11px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 0;
+  height: 80px;
+  overflow: hidden;
+}
+#tl-field-bar .tl-field-label { color: var(--text-muted); flex-shrink: 0; }
+#tl-field-bar button {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+#tl-field-bar button:hover { background: var(--accent); color: var(--text); }
+#tl-field-bar input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  width: 140px;
+  flex-shrink: 0;
+}
+#tl-field-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  flex: 1;
+}
+.tl-chip {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  user-select: none;
+  white-space: nowrap;
+}
+.tl-chip.pinned {
+  background: var(--surface2);
+  color: var(--rx-color);
+  border-color: var(--rx-color);
+}
+.tl-chip.has-changes { font-style: italic; }
+#timeline-empty {
+  padding: 20px;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 12px;
+}
+#hex-dump {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+  color: var(--text-muted);
+}
+.hex-offset { color: var(--text-muted); }
+.hex-byte { color: var(--text); }
+.hex-ascii { color: var(--tx-color); }
+
+#toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 6px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 12px;
+}
+#toolbar button {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text);
+}
+#toolbar button:hover { background: var(--accent); }
+#toolbar label { color: var(--text-muted); }
+#toolbar input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  width: 60px;
+}
+#packet-count { color: var(--text-muted); margin-left: auto; font-size: 11px; }
+
+.compat-error {
+  text-align: center;
+  padding: 40px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+/* Login modal */
+#login-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+#login-overlay.visible { display: flex; }
+#login-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  width: 360px;
+  max-width: 90vw;
+}
+#login-modal h2 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: var(--accent);
+}
+#login-modal label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  margin-top: 12px;
+}
+#login-modal input, #login-modal select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+#login-modal .btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+#login-modal button {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text);
+  transition: background 0.2s;
+}
+#login-modal button:hover { background: var(--accent); }
+#login-modal button:disabled { opacity: 0.4; cursor: default; background: var(--surface2); }
+#login-modal button.primary { background: var(--accent); }
+#login-modal button.primary:hover { background: #c03050; }
+#login-error {
+  color: var(--accent);
+  font-size: 12px;
+  margin-top: 10px;
+  min-height: 16px;
+}
+#login-success {
+  color: var(--rx-color);
+  font-size: 12px;
+  margin-top: 10px;
+  min-height: 16px;
+}
+
+/* Requirements banner */
+#requirements-banner {
+  display: none;
+  padding: 12px 20px;
+  background: #2a1a00;
+  border-bottom: 1px solid #4a3000;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#requirements-banner.visible { display: block; }
+#requirements-banner .req-title {
+  color: #ffcc00;
+  font-weight: bold;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+#requirements-banner .req-ok { color: var(--rx-color); }
+#requirements-banner .req-fail { color: var(--accent); }
+#requirements-banner .req-flag {
+  color: var(--tx-color);
+  user-select: all;
+  cursor: pointer;
+}
+#requirements-banner a {
+  color: var(--tx-color);
+  text-decoration: underline;
+}
+#requirements-banner .req-dismiss {
+  float: right;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+#requirements-banner .req-dismiss:hover { color: var(--text); }
+@keyframes hint-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(233, 69, 96, 0.3); }
+  50% { box-shadow: 0 0 10px rgba(233, 69, 96, 0.7); }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>EcoFlow BLE Debug</h1>
+  <span id="status">Disconnected</span>
+</header>
+
+<div id="requirements-banner">
+  <button class="req-dismiss" onclick="this.parentElement.classList.remove('visible')">[dismiss]</button>
+  <div class="req-title">Browser requirements</div>
+  <div id="req-checks"></div>
+</div>
+
+<div id="connection-panel">
+  <input id="user-id" placeholder="User ID" style="width:280px">
+  <button id="btn-login" onclick="app.showLogin()">Login</button>
+  <input id="serial-number" placeholder="Serial Number (auto-detect)" style="width:200px">
+  <button id="btn-scan" onclick="app.scan()">Scan &amp; Connect</button>
+  <button id="btn-disconnect" onclick="app.disconnect()" disabled>Disconnect</button>
+</div>
+
+<div id="login-overlay" onclick="if(event.target===this)app.hideLogin()">
+  <div id="login-modal">
+    <h2>EcoFlow Cloud Login</h2>
+    <label for="login-email">Email</label>
+    <input id="login-email" type="email" placeholder="your@email.com">
+    <label for="login-password">Password</label>
+    <input id="login-password" type="password" placeholder="Password">
+    <label for="login-region">Region</label>
+    <select id="login-region">
+      <option value="auto">Auto (Global)</option>
+      <option value="eu">Europe</option>
+      <option value="us">United States</option>
+    </select>
+    <div id="login-error"></div>
+    <div id="login-success"></div>
+    <div class="btn-row">
+      <button onclick="app.hideLogin()">Cancel</button>
+      <button class="primary" id="btn-do-login" onclick="app.doLogin()">Log in</button>
+    </div>
+  </div>
+</div>
+
+<div id="log-area"></div>
+<div class="resize-handle-v" id="log-resize"></div>
+
+<div id="toolbar">
+  <button onclick="app.clearPackets()">Clear</button>
+  <label>Filter cmd_set:</label>
+  <input id="filter-cmdset" placeholder="hex" oninput="app.applyFilter()">
+  <label>cmd_id:</label>
+  <input id="filter-cmdid" placeholder="hex" oninput="app.applyFilter()">
+  <label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label>
+  <label><input type="checkbox" id="auto-reply"> Reply packets</label>
+  <label>Max:</label>
+  <input id="max-packets" type="number" value="100" min="10" max="10000" style="width:55px" onchange="app.applyMaxPackets()">
+  <span id="packet-count">0 packets</span>
+</div>
+
+<div id="main-content">
+  <div id="packet-log">
+    <table>
+      <thead>
+        <tr>
+          <th data-col="#">#</th><th data-col="Time">Time</th><th data-col="Dir">Dir</th><th data-col="Ver">Ver</th>
+          <th data-col="Src">Src</th><th data-col="Dst">Dst</th><th data-col="dSrc">dSrc</th><th data-col="dDst">dDst</th>
+          <th data-col="CmdSet">CmdSet</th><th data-col="CmdId">CmdId</th><th data-col="Len">Len</th><th data-col="Seq">Seq</th>
+        </tr>
+      </thead>
+      <tbody id="packet-tbody"></tbody>
+    </table>
+  </div>
+  <div class="resize-handle-h" id="panel-resize"></div>
+  <div id="payload-detail">
+    <div id="proto-bar">
+      <label>Proto:</label>
+      <select id="proto-file" onchange="app.onProtoFileChange()">
+        <option value="">None (hex only)</option>
+      </select>
+      <label>Message:</label>
+      <select id="proto-msg" onchange="app.onMsgTypeChange()"></select>
+      <button onclick="app.showCustomProto()">Paste custom</button>
+    </div>
+    <div id="payload-tabs">
+      <button class="active" onclick="app.switchPayloadTab('packet')">Packet</button>
+      <button onclick="app.switchPayloadTab('timeline')">Timeline</button>
+    </div>
+
+    <div id="view-packet" class="active">
+      <h3>Payload <button onclick="app.xorPayload()" title="XOR payload with seq[0] byte">XOR seq[0]</button> <button onclick="app.copyPayload()" title="Copy payload hex">Copy payload</button> <button onclick="app.copyRawPacket()" title="Copy full raw packet hex">Copy raw packet</button></h3>
+      <div id="proto-decoded"></div>
+      <pre id="hex-dump">Select a packet to view payload</pre>
+    </div>
+
+    <div id="view-timeline">
+      <div id="timeline-controls">
+        <button onclick="app.refreshTimeline()">Refresh</button>
+        <label><input type="checkbox" id="tl-changes-only" onchange="app.refreshTimeline()"> Changes only</label>
+        <label><input type="checkbox" id="tl-auto-refresh" checked> Live</label>
+        <select id="tl-direction" onchange="app.refreshTimeline()">
+          <option value="">All</option>
+          <option value="RX">RX only</option>
+          <option value="TX">TX only</option>
+        </select>
+        <span id="tl-count"></span>
+      </div>
+      <div id="tl-field-bar">
+        <span class="tl-field-label">Fields:</span>
+        <button onclick="app.tlPinAll()">All</button>
+        <button onclick="app.tlPinNone()">None</button>
+        <button onclick="app.tlPinChanged()">Changed</button>
+        <input id="tl-field-filter" placeholder="Filter fields..." oninput="app.renderFieldChips()">
+        <div id="tl-field-chips"></div>
+      </div>
+      <div class="resize-handle-v" id="field-bar-resize"></div>
+      <div id="timeline-wrap">
+        <div id="timeline-empty">Select a proto file and message type, then switch to Timeline</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="custom-proto-overlay" onclick="if(event.target===this)this.classList.remove('visible')">
+  <div id="custom-proto-modal">
+    <h2>Custom .proto definition</h2>
+    <textarea id="custom-proto-text" placeholder="syntax = &quot;proto3&quot;;&#10;&#10;message MyMessage {&#10;  uint32 field1 = 1;&#10;  string field2 = 2;&#10;}"></textarea>
+    <div id="custom-proto-error"></div>
+    <div class="btn-row">
+      <button onclick="document.getElementById('custom-proto-overlay').classList.remove('visible')">Cancel</button>
+      <button class="primary" onclick="app.loadCustomProto()">Load</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.6.1/elliptic.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/protobufjs/7.4.0/protobuf.min.js"></script>
+<script src="keydata.js"></script>
+<script src="protos.js"></script>
+<script>
+'use strict';
+
+// ============================================================================
+// CRC8 - CCITT (poly=0x07, init=0x00)
+// ============================================================================
+const CRC8_TABLE = new Uint8Array(256);
+(function() {
+  for (let i = 0; i < 256; i++) {
+    let crc = i;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) & 0xFF : (crc << 1) & 0xFF;
+    }
+    CRC8_TABLE[i] = crc;
+  }
+})();
+
+function crc8(data) {
+  let crc = 0x00;
+  for (let i = 0; i < data.length; i++) {
+    crc = CRC8_TABLE[(crc ^ data[i]) & 0xFF];
+  }
+  return crc;
+}
+
+// ============================================================================
+// CRC16 - ARC (poly=0x8005, init=0x0000, reflect in+out)
+// ============================================================================
+const CRC16_TABLE = new Uint16Array(256);
+(function() {
+  for (let i = 0; i < 256; i++) {
+    let crc = i;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 1) ? ((crc >>> 1) ^ 0xA001) : (crc >>> 1);
+    }
+    CRC16_TABLE[i] = crc;
+  }
+})();
+
+function crc16(data) {
+  let crc = 0x0000;
+  for (let i = 0; i < data.length; i++) {
+    crc = ((crc >>> 8) ^ CRC16_TABLE[(crc ^ data[i]) & 0xFF]) & 0xFFFF;
+  }
+  return crc;
+}
+
+// ============================================================================
+// MD5 (RFC 1321)
+// ============================================================================
+function md5(input) {
+  const bytes = (input instanceof Uint8Array) ? input : new TextEncoder().encode(input);
+
+  function leftRotate(x, c) { return ((x << c) | (x >>> (32 - c))) >>> 0; }
+
+  const s = [
+    7,12,17,22, 7,12,17,22, 7,12,17,22, 7,12,17,22,
+    5, 9,14,20, 5, 9,14,20, 5, 9,14,20, 5, 9,14,20,
+    4,11,16,23, 4,11,16,23, 4,11,16,23, 4,11,16,23,
+    6,10,15,21, 6,10,15,21, 6,10,15,21, 6,10,15,21
+  ];
+
+  const K = new Uint32Array(64);
+  for (let i = 0; i < 64; i++) {
+    K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 0x100000000) >>> 0;
+  }
+
+  // Pre-processing: padding
+  // Total = message + 1 (0x80) + zeros + 8 (length), must be multiple of 64
+  const bitLen = bytes.length * 8;
+  const totalWithout = bytes.length + 1 + 8; // message + 0x80 byte + 8 byte length
+  const padded = new Uint8Array(Math.ceil(totalWithout / 64) * 64);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
+  // Length in bits as 64-bit LE
+  const dv = new DataView(padded.buffer);
+  dv.setUint32(padded.length - 8, bitLen >>> 0, true);
+  dv.setUint32(padded.length - 4, 0, true); // upper 32 bits (assume < 2^32 bits)
+
+  let a0 = 0x67452301 >>> 0;
+  let b0 = 0xefcdab89 >>> 0;
+  let c0 = 0x98badcfe >>> 0;
+  let d0 = 0x10325476 >>> 0;
+
+  for (let offset = 0; offset < padded.length; offset += 64) {
+    const M = new Uint32Array(16);
+    for (let j = 0; j < 16; j++) {
+      M[j] = dv.getUint32(offset + j * 4, true);
+    }
+
+    let A = a0, B = b0, C = c0, D = d0;
+
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16) {
+        F = ((B & C) | (~B & D)) >>> 0;
+        g = i;
+      } else if (i < 32) {
+        F = ((D & B) | (~D & C)) >>> 0;
+        g = (5 * i + 1) % 16;
+      } else if (i < 48) {
+        F = (B ^ C ^ D) >>> 0;
+        g = (3 * i + 5) % 16;
+      } else {
+        F = (C ^ (B | ~D)) >>> 0;
+        g = (7 * i) % 16;
+      }
+
+      F = (F + A + K[i] + M[g]) >>> 0;
+      A = D;
+      D = C;
+      C = B;
+      B = (B + leftRotate(F, s[i])) >>> 0;
+    }
+
+    a0 = (a0 + A) >>> 0;
+    b0 = (b0 + B) >>> 0;
+    c0 = (c0 + C) >>> 0;
+    d0 = (d0 + D) >>> 0;
+  }
+
+  const result = new Uint8Array(16);
+  const rdv = new DataView(result.buffer);
+  rdv.setUint32(0, a0, true);
+  rdv.setUint32(4, b0, true);
+  rdv.setUint32(8, c0, true);
+  rdv.setUint32(12, d0, true);
+  return result;
+}
+
+function md5hex(input) {
+  return Array.from(md5(input), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ============================================================================
+// AES-CBC Encryption (Web Crypto API)
+// ============================================================================
+class AESCrypto {
+  constructor(key, iv) {
+    this.keyBytes = key;
+    this.ivBytes = iv;
+    this._cryptoKey = null;
+  }
+
+  async _getKey() {
+    if (!this._cryptoKey) {
+      this._cryptoKey = await crypto.subtle.importKey(
+        'raw', this.keyBytes, { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']
+      );
+    }
+    return this._cryptoKey;
+  }
+
+  async encrypt(plaintext) {
+    // PKCS7 padding is handled by Web Crypto
+    const key = await this._getKey();
+    const ct = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: this.ivBytes }, key, plaintext);
+    return new Uint8Array(ct);
+  }
+
+  async decrypt(ciphertext) {
+    const key = await this._getKey();
+    try {
+      const pt = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: this.ivBytes }, key, ciphertext);
+      return new Uint8Array(pt);
+    } catch (e) {
+      // Fallback: try without unpadding (for corrupt/partial data)
+      throw new Error('AES decrypt failed: ' + e.message);
+    }
+  }
+}
+
+// Type1 encryption: zero-padding, no unpad on decrypt
+class AESCryptoType1 {
+  constructor(key, iv) {
+    this.keyBytes = key;
+    this.ivBytes = iv;
+    this._cryptoKey = null;
+  }
+
+  async _getKey() {
+    if (!this._cryptoKey) {
+      this._cryptoKey = await crypto.subtle.importKey(
+        'raw', this.keyBytes, { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']
+      );
+    }
+    return this._cryptoKey;
+  }
+
+  async encrypt(plaintext) {
+    const padLen = ((plaintext.length + 15) >> 4) << 4;
+    const padded = new Uint8Array(padLen);
+    padded.set(plaintext);
+    const key = await this._getKey();
+    // Encrypt without Web Crypto's auto-padding: add a full block of PKCS7 padding
+    // then strip it from result. Or: use raw blocks.
+    // Simpler: manually pad to block size with zeros, then encrypt with PKCS7
+    // and take only the first padLen bytes of output.
+    // Web Crypto always adds PKCS7 padding, so we get padLen+16 bytes back.
+    const ct = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: this.ivBytes }, key, padded);
+    return new Uint8Array(ct).slice(0, padLen);
+  }
+
+  async decrypt(ciphertext) {
+    // For type1, no unpadding - raw decrypt
+    // Web Crypto expects PKCS7 padded data. We need to add a padding block.
+    // Actually for decryption we can just add 16 zero bytes and decrypt, then take original length.
+    // Alternatively, implement AES-CBC manually... Let's use a trick:
+    // Decrypt each 16-byte block manually using the Web Crypto single-block approach.
+    const key = await this._getKey();
+    const result = new Uint8Array(ciphertext.length);
+    let prevBlock = this.ivBytes;
+
+    for (let i = 0; i < ciphertext.length; i += 16) {
+      const block = ciphertext.slice(i, i + 16);
+      // Encrypt a zero block to get the raw AES, then... actually this is complex.
+      // Let's just use a padded approach: append 16 bytes of 0x10 (valid PKCS7)
+      const padded = new Uint8Array(ciphertext.length + 16);
+      padded.set(ciphertext);
+      padded.fill(16, ciphertext.length); // PKCS7 padding of full block
+      try {
+        const pt = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: this.ivBytes }, key, padded);
+        return new Uint8Array(pt);
+      } catch {
+        // If PKCS7 unpad fails, the last block padding might be wrong. Use ECB fallback.
+        throw new Error('Type1 decrypt failed');
+      }
+    }
+    return result;
+  }
+}
+
+// ============================================================================
+// KeyData
+// ============================================================================
+function getKeyData(pos, len) {
+  return KEYDATA.slice(pos, pos + len);
+}
+
+// ============================================================================
+// Packet
+// ============================================================================
+class Packet {
+  static PREFIX = 0xAA;
+
+  constructor(src, dst, cmdSet, cmdId, payload = new Uint8Array(0), dsrc = 1, ddst = 1, version = 3, seq = null, productId = 0) {
+    this.src = src;
+    this.dst = dst;
+    this.cmdSet = cmdSet;
+    this.cmdId = cmdId;
+    this.payload = payload;
+    this.dsrc = dsrc;
+    this.ddst = ddst;
+    this.version = version;
+    this.seq = seq || new Uint8Array(4);
+    this.productId = productId;
+  }
+
+  static fromBytes(data, xorPayload = false) {
+    if (data[0] !== Packet.PREFIX) {
+      return null;
+    }
+
+    const version = data[1];
+    if ((version === 2 && data.length < 18) || ([3, 4].includes(version) && data.length < 20)) {
+      return null;
+    }
+
+    const payloadLength = data[2] | (data[3] << 8); // LE uint16
+
+    // CRC16 check for v2/3/4
+    if ([2, 3, 4].includes(version)) {
+      const expectedCrc = data[data.length - 2] | (data[data.length - 1] << 8);
+      if (crc16(data.slice(0, -2)) !== expectedCrc) {
+        return null;
+      }
+    }
+
+    // CRC8 header check
+    if (crc8(data.slice(0, 4)) !== data[4]) {
+      return null;
+    }
+
+    const seq = data.slice(6, 10);
+    const src = data[12];
+    const dst = data[13];
+
+    let dsrc = 0, ddst = 0, cmdSet, cmdId;
+    const payloadStart = version === 2 ? 16 : 18;
+
+    if (version === 2) {
+      cmdSet = data[14];
+      cmdId = data[15];
+    } else {
+      dsrc = data[14];
+      ddst = data[15];
+      cmdSet = data[16];
+      cmdId = data[17];
+    }
+
+    let payload = new Uint8Array(0);
+    if (payloadLength > 0) {
+      payload = data.slice(payloadStart, payloadStart + payloadLength);
+
+      // XOR payload with seq[0] if needed
+      if (xorPayload && seq[0] !== 0) {
+        payload = payload.map(b => b ^ seq[0]);
+      }
+
+      // Strip trailing 0xBBBB for version 0x13
+      if (version === 0x13 && payload.length >= 2 &&
+          payload[payload.length - 2] === 0xBB && payload[payload.length - 1] === 0xBB) {
+        payload = payload.slice(0, -2);
+      }
+    }
+
+    return new Packet(src, dst, cmdSet, cmdId, payload, dsrc, ddst, version, seq, 0);
+  }
+
+  toBytes() {
+    const parts = [];
+
+    // Header
+    const header = new Uint8Array(4);
+    header[0] = Packet.PREFIX;
+    header[1] = this.version;
+    header[2] = this.payload.length & 0xFF;
+    header[3] = (this.payload.length >> 8) & 0xFF;
+    parts.push(header);
+
+    // Header CRC
+    parts.push(new Uint8Array([crc8(header)]));
+
+    // Product byte + seq + reserved
+    const productByte = this.productId >= 0 ? 0x0D : 0x0C;
+    parts.push(new Uint8Array([productByte]));
+    parts.push(this.seq);
+    parts.push(new Uint8Array([0x00, 0x00]));
+
+    // Addresses
+    parts.push(new Uint8Array([this.src, this.dst]));
+    if (this.version >= 0x03) {
+      parts.push(new Uint8Array([this.dsrc, this.ddst]));
+    }
+
+    // Command
+    parts.push(new Uint8Array([this.cmdSet, this.cmdId]));
+
+    // Payload
+    parts.push(this.payload);
+
+    // Concatenate all parts
+    const totalLen = parts.reduce((s, p) => s + p.length, 0);
+    const data = new Uint8Array(totalLen + 2); // +2 for CRC16
+    let offset = 0;
+    for (const p of parts) {
+      data.set(p, offset);
+      offset += p.length;
+    }
+
+    // CRC16
+    const c = crc16(data.slice(0, offset));
+    data[offset] = c & 0xFF;
+    data[offset + 1] = (c >> 8) & 0xFF;
+
+    return data;
+  }
+
+  toString() {
+    return `Packet(src=0x${hex(this.src)}, dst=0x${hex(this.dst)}, cmd_set=0x${hex(this.cmdSet)}, cmd_id=0x${hex(this.cmdId)}, dsrc=0x${hex(this.dsrc)}, ddst=0x${hex(this.ddst)}, ver=0x${hex(this.version)}, payload=${this.payload.length}B)`;
+  }
+}
+
+function hex(v) { return v.toString(16).padStart(2, '0').toUpperCase(); }
+function hexBytes(arr) { return Array.from(arr, b => hex(b)).join(' '); }
+
+// ============================================================================
+// EncPacket
+// ============================================================================
+const ENCPACKET_PREFIX = new Uint8Array([0x5A, 0x5A]);
+
+function encPacketEncode(frameType, payload, encKey = null, iv = null) {
+  let encPayload = payload;
+  // We handle encryption externally, just build the frame
+  const header = new Uint8Array(6);
+  header[0] = 0x5A;
+  header[1] = 0x5A;
+  header[2] = (frameType << 4) & 0xFF;
+  header[3] = 0x01;
+  const plen = encPayload.length + 2;
+  header[4] = plen & 0xFF;
+  header[5] = (plen >> 8) & 0xFF;
+
+  const frame = new Uint8Array(6 + encPayload.length + 2);
+  frame.set(header);
+  frame.set(encPayload, 6);
+  const c = crc16(frame.slice(0, 6 + encPayload.length));
+  frame[6 + encPayload.length] = c & 0xFF;
+  frame[6 + encPayload.length + 1] = (c >> 8) & 0xFF;
+  return frame;
+}
+
+// ============================================================================
+// SimplePacketAssembler (unencrypted command frames)
+// ============================================================================
+class SimplePacketAssembler {
+  constructor() {
+    this.buffer = new Uint8Array(0);
+  }
+
+  static encode(payload) {
+    return encPacketEncode(0x00, payload);
+  }
+
+  parse(data) {
+    if (this.buffer.length > 0) {
+      const combined = new Uint8Array(this.buffer.length + data.length);
+      combined.set(this.buffer);
+      combined.set(data, this.buffer.length);
+      data = combined;
+      this.buffer = new Uint8Array(0);
+    }
+
+    let offset = 0;
+    while (offset < data.length) {
+      const start = findPrefix(data, 0x5A5A, offset);
+      if (start < 0) return null;
+      if (start > offset) offset = start;
+
+      if (data.length - offset < 8) {
+        this.buffer = data.slice(offset);
+        return null;
+      }
+
+      const header = data.slice(offset, offset + 6);
+      const payloadLen = header[4] | (header[5] << 8);
+      const dataEnd = offset + 6 + payloadLen;
+
+      if (dataEnd > data.length) {
+        const nextPrefix = findPrefix(data, 0x5A5A, offset + 2);
+        if (nextPrefix >= 0) {
+          offset = nextPrefix;
+          continue;
+        }
+        this.buffer = data.slice(offset);
+        return null;
+      }
+
+      const payloadData = data.slice(offset + 6, dataEnd - 2);
+      const payloadCrc = data[dataEnd - 2] | (data[dataEnd - 1] << 8);
+
+      const headerAndPayload = new Uint8Array(6 + payloadData.length);
+      headerAndPayload.set(header);
+      headerAndPayload.set(payloadData, 6);
+
+      if (crc16(headerAndPayload) !== payloadCrc) {
+        offset += 2;
+        continue;
+      }
+
+      return payloadData;
+    }
+    return null;
+  }
+}
+
+// ============================================================================
+// EncPacketAssembler (encrypted data frames)
+// ============================================================================
+class EncPacketAssembler {
+  constructor(crypto) {
+    this.crypto = crypto;
+    this.buffer = new Uint8Array(0);
+  }
+
+  async reassemble(data) {
+    if (this.buffer.length > 0) {
+      const combined = new Uint8Array(this.buffer.length + data.length);
+      combined.set(this.buffer);
+      combined.set(data, this.buffer.length);
+      data = combined;
+      this.buffer = new Uint8Array(0);
+    }
+
+    const payloads = [];
+    let offset = 0;
+
+    while (offset < data.length) {
+      const start = findPrefix(data, 0x5A5A, offset);
+      if (start < 0) break;
+      if (start > offset) offset = start;
+
+      if (data.length - offset < 8) break;
+
+      const header = data.slice(offset, offset + 6);
+      const payloadLen = header[4] | (header[5] << 8);
+
+      if (payloadLen > 10000) {
+        offset += 2;
+        continue;
+      }
+
+      const dataEnd = offset + 6 + payloadLen;
+      if (dataEnd > data.length) {
+        const nextPrefix = findPrefix(data, 0x5A5A, offset + 2);
+        if (nextPrefix >= 0) {
+          offset = nextPrefix;
+          continue;
+        }
+        break;
+      }
+
+      const payloadData = data.slice(offset + 6, dataEnd - 2);
+      const payloadCrc = data[dataEnd - 2] | (data[dataEnd - 1] << 8);
+
+      const headerAndPayload = new Uint8Array(6 + payloadData.length);
+      headerAndPayload.set(header);
+      headerAndPayload.set(payloadData, 6);
+
+      if (crc16(headerAndPayload) !== payloadCrc) {
+        offset += 2;
+        continue;
+      }
+
+      offset = dataEnd;
+      try {
+        const decrypted = await this.crypto.decrypt(payloadData);
+        payloads.push(decrypted);
+      } catch (e) {
+        console.error('Decrypt failed:', e);
+      }
+    }
+
+    this.buffer = data.slice(offset);
+    return payloads;
+  }
+}
+
+function findPrefix(data, prefix, start) {
+  const hi = (prefix >> 8) & 0xFF;
+  const lo = prefix & 0xFF;
+  for (let i = start; i < data.length - 1; i++) {
+    if (data[i] === hi && data[i + 1] === lo) return i;
+  }
+  return -1;
+}
+
+// ============================================================================
+// ECDH (SECP160r1 via elliptic.js with custom curve definition)
+// ============================================================================
+
+// SECP160r1 is not built into elliptic.js, so we define it manually.
+// elliptic.ec reads hash.hmacStrength and hash.blockSize during key generation,
+// so we provide a stub hash object with the required properties.
+const _stubHash = { hmacStrength: 20, blockSize: 64, outSize: 20 };
+const secp160r1 = new elliptic.ec(
+  new elliptic.curves.PresetCurve({
+    type: 'short',
+    prime: null,
+    p: 'ffffffff ffffffff ffffffff ffffffff 7fffffff',
+    a: 'ffffffff ffffffff ffffffff ffffffff 7ffffffc', // p - 3
+    b: '1c97befc 54bd7a8b 65acf89f 81d4d4ad c565fa45',
+    n: '01 00000000 00000000 0001f4c8 f927aed3 ca752257',
+    hash: _stubHash,
+    gRed: false,
+    g: [
+      '4a96b568 8ef57328 4664698968c38bb9 13cbfc82',
+      '23a62855 3168947d 59dcc912 04235137 7ac5fb32'
+    ]
+  })
+);
+
+function getEcdhTypeSize(curveNum) {
+  switch (curveNum) {
+    case 1: return 52;
+    case 2: return 56;
+    case 3: case 4: return 64;
+    default: return 40;
+  }
+}
+
+// ============================================================================
+// Session Key Generation
+// ============================================================================
+function genSessionKey(seed, srand) {
+  const pos = seed[0] * 0x10 + ((seed[1] - 1) & 0xFF) * 0x100;
+  const kd0 = getKeyData(pos, 8);
+  const kd1 = getKeyData(pos + 8, 8);
+
+  // Pack as 32 bytes LE: kd0(8) + kd1(8) + srand[0:8] + srand[8:16]
+  const combined = new Uint8Array(32);
+  combined.set(kd0, 0);
+  combined.set(kd1, 8);
+  combined.set(srand.slice(0, 8), 16);
+  combined.set(srand.slice(8, 16), 24);
+
+  return md5(combined);
+}
+
+// ============================================================================
+// Application
+// ============================================================================
+class App {
+  constructor() {
+    this.device = null;
+    this.server = null;
+    this.writeChar = null;
+    this.notifyChar = null;
+    this.crypto = null;
+    this.encAssembler = null;
+    this.simpleAssembler = new SimplePacketAssembler();
+    this.packets = [];
+    this.packetCounter = 0;
+    this.selectedIdx = -1;
+    this.serialNumber = '';
+    this.packetVersion = 3;
+    this.authHeaderDst = 0x35;
+    this._notifyHandler = null;
+    this._resolveNotify = null;
+    this._scannedSNs = new Map(); // device name → serial number from pre-scan
+    this._protoRoot = null; // current loaded protobuf root
+    this._protoMessages = []; // list of message type names
+    this._packetColumnOrder = ['#','Time','Dir','Ver','Src','Dst','dSrc','dDst','CmdSet','CmdId','Len','Seq'];
+    this._initProtoSelector();
+  }
+
+  log(msg, cls = '') {
+    const area = document.getElementById('log-area');
+    const div = document.createElement('div');
+    if (cls) div.className = 'log-' + cls;
+    const ts = new Date().toLocaleTimeString();
+    div.textContent = `[${ts}] ${msg}`;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  setStatus(text, cls = '') {
+    const el = document.getElementById('status');
+    el.textContent = text;
+    el.className = cls;
+  }
+
+  showLogin() {
+    document.getElementById('login-overlay').classList.add('visible');
+    document.getElementById('login-error').textContent = '';
+    document.getElementById('login-success').textContent = '';
+    document.getElementById('login-email').focus();
+  }
+
+  hideLogin() {
+    document.getElementById('login-overlay').classList.remove('visible');
+  }
+
+  async doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const region = document.getElementById('login-region').value;
+
+    if (!email || !password) {
+      document.getElementById('login-error').textContent = 'Email and password are required.';
+      return;
+    }
+
+    const REGIONS = {
+      auto: 'api.ecoflow.com',
+      eu: 'api-e.ecoflow.com',
+      us: 'api-a.ecoflow.com',
+    };
+
+    const errorEl = document.getElementById('login-error');
+    const successEl = document.getElementById('login-success');
+    const btn = document.getElementById('btn-do-login');
+
+    errorEl.textContent = '';
+    successEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Logging in...';
+
+    try {
+      const baseUrl = REGIONS[region] || REGIONS.auto;
+      const resp = await fetch(`https://${baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scene: 'IOT_APP',
+          appVersion: '1.0.0',
+          password: btoa(password),
+          oauth: { bundleId: 'com.ef.EcoFlow' },
+          email: email,
+          userType: 'ECOFLOW',
+        }),
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
+
+      const result = await resp.json();
+      if (result.code !== '0') {
+        throw new Error(result.message || 'Login failed');
+      }
+
+      const userId = String(result.data.user.userId);
+      document.getElementById('user-id').value = userId;
+      localStorage.setItem('ef-ble-userId', userId);
+      successEl.textContent = `Logged in. User ID: ${userId}`;
+      this.log(`EcoFlow login successful. User ID: ${userId}`, 'success');
+
+      this._updateConnectionHints();
+      setTimeout(() => this.hideLogin(), 1500);
+    } catch (e) {
+      errorEl.textContent = e.message;
+      this.log(`EcoFlow login failed: ${e.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Log in';
+    }
+  }
+
+  async scan() {
+    if (!navigator.bluetooth) {
+      this.log('Web Bluetooth API not available. Use Chrome/Edge over HTTPS or localhost.', 'error');
+      return;
+    }
+
+    try {
+      this.setStatus('Scanning...', 'connecting');
+
+      // Start a background LE scan to capture serial numbers from manufacturer data.
+      // This runs concurrently with the device picker so it doesn't block.
+      const snInput = document.getElementById('serial-number').value.trim();
+      let scanPromise = null;
+      this.log(`[Scan] requestLEScan available: ${!!navigator.bluetooth.requestLEScan}`, 'info');
+      if (!snInput && navigator.bluetooth.requestLEScan) {
+        scanPromise = this._preScan();
+      } else if (!snInput) {
+        this.log('[Scan] No requestLEScan — serial number must be entered manually', 'info');
+      }
+
+      this.log('[Scan] Opening device picker with manufacturer filter (0xB5B5)...', 'info');
+
+      // Try with manufacturer data filter first
+      let device;
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ manufacturerData: [{ companyIdentifier: 0xB5B5 }] }],
+          optionalServices: [
+            '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // NUS service
+            '00000001-0000-1000-8000-00805f9b34fb',  // RFCOMM service
+          ]
+        });
+        this.log('[Scan] Device selected via manufacturer filter', 'success');
+      } catch (e) {
+        this.log(`[Scan] Manufacturer filter failed: ${e.name}: ${e.message}`, 'error');
+        this.log('[Scan] Retrying with name prefix filter (EF-)...', 'info');
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: 'EF-' }],
+          optionalServices: [
+            '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+            '00000001-0000-1000-8000-00805f9b34fb',
+          ]
+        });
+        this.log('[Scan] Device selected via name prefix filter', 'success');
+      }
+
+      this.device = device;
+      this.log(`[Scan] Selected: name=${device.name || 'N/A'}, id=${device.id}`, 'success');
+
+      // Stop the background scan and check results
+      if (scanPromise) {
+        this._stopPreScan();
+        this.log(`[Scan] Pre-scan collected ${this._scannedSNs.size} SN(s): ${[...this._scannedSNs.entries()].map(([k,v]) => k+'='+v).join(', ') || 'none'}`, 'info');
+      }
+
+      // Check if pre-scan captured the SN for this device
+      if (!this.serialNumber && device.name && this._scannedSNs.has(device.name)) {
+        this.serialNumber = this._scannedSNs.get(device.name);
+        document.getElementById('serial-number').value = this.serialNumber;
+        localStorage.setItem('ef-ble-serialNumber', this.serialNumber);
+        this.log(`Serial number from pre-scan: ${this.serialNumber}`, 'success');
+      }
+
+      // Resolve serial number (re-check since pre-scan may have filled it)
+      const snCurrent = document.getElementById('serial-number').value.trim();
+      if (snCurrent) {
+        this.serialNumber = snCurrent;
+      } else {
+        // Try to extract SN from manufacturer data (requires experimental flags)
+        const sn = await this._extractSerialNumber();
+        if (sn) {
+          this.serialNumber = sn;
+          document.getElementById('serial-number').value = sn;
+          localStorage.setItem('ef-ble-serialNumber', sn);
+          this.log(`Serial number from manufacturer data: ${sn}`, 'success');
+        } else if (!this.serialNumber) {
+          this.log('Serial number required. Find it in: EcoFlow app → Device → Settings, or on the device label (16 characters, e.g. R39Rxxxxxxxxxxxx).', 'error');
+          this.setStatus('Need Serial Number', 'error');
+          document.getElementById('serial-number').focus();
+          return;
+        }
+      }
+
+      device.addEventListener('gattserverdisconnected', () => {
+        this.log('Device disconnected', 'error');
+        this.setStatus('Disconnected', '');
+        document.getElementById('btn-scan').disabled = false;
+        document.getElementById('btn-disconnect').disabled = true;
+      });
+
+      await this.connect();
+    } catch (e) {
+      this.log(`Scan failed: ${e.message}`, 'error');
+      this.setStatus('Error', 'error');
+    }
+  }
+
+  async connect() {
+    try {
+      this.setStatus('Connecting...', 'connecting');
+      document.getElementById('btn-scan').disabled = true;
+
+      this.log('Connecting to GATT server...', 'info');
+      this.server = await this.device.gatt.connect();
+
+      // Find characteristics
+      await this._findCharacteristics();
+
+      // Serial number was already resolved in scan() before connecting
+
+      this.log('Starting ECDH key exchange...', 'info');
+      await this._ecdhKeyExchange();
+
+    } catch (e) {
+      this.log(`Connection failed: ${e.message}`, 'error');
+      this.setStatus('Error', 'error');
+      document.getElementById('btn-scan').disabled = false;
+      console.error(e);
+    }
+  }
+
+  async _preScan() {
+    // Use requestLEScan() to capture manufacturer data from nearby EcoFlow devices.
+    // Runs concurrently with the device picker dialog. Does NOT await — just starts
+    // collecting and _stopPreScan() ends it.
+    this.log('[PreScan] requestLEScan available: ' + !!navigator.bluetooth.requestLEScan, 'info');
+    try {
+      this._preScanObj = await navigator.bluetooth.requestLEScan({
+        filters: [{ manufacturerData: [{ companyIdentifier: 0xB5B5 }] }],
+      });
+      this.log('[PreScan] LE scan started, listening for advertisements...', 'info');
+
+      this._preScanHandler = (event) => {
+        this.log(`[PreScan] Advertisement: name=${event.device.name}, rssi=${event.rssi}`, 'info');
+        if (event.manufacturerData) {
+          for (const [companyId, dataView] of event.manufacturerData) {
+            const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+            this.log(`[PreScan] mfr 0x${companyId.toString(16)} (${bytes.length}B): ${hexBytes(bytes)}`, 'info');
+          }
+        }
+        const sn = this._parseSNFromManufacturerData(event.manufacturerData);
+        if (sn && event.device.name) {
+          this._scannedSNs.set(event.device.name, sn);
+          this.log(`[PreScan] Mapped: ${event.device.name} → SN: ${sn}`, 'success');
+        }
+      };
+      navigator.bluetooth.addEventListener('advertisementreceived', this._preScanHandler);
+    } catch (e) {
+      this.log(`[PreScan] Failed: ${e.name}: ${e.message}`, 'error');
+    }
+  }
+
+  _stopPreScan() {
+    try {
+      if (this._preScanObj) {
+        this._preScanObj.stop();
+        this._preScanObj = null;
+      }
+      if (this._preScanHandler) {
+        navigator.bluetooth.removeEventListener('advertisementreceived', this._preScanHandler);
+        this._preScanHandler = null;
+      }
+    } catch {}
+  }
+
+  async _extractSerialNumber() {
+    // The real serial number is 16 ASCII bytes at offset 1-17 in manufacturer data
+    // (company identifier 0xB5B5).
+    //
+    // Strategy 1: watchAdvertisements on the selected device
+    // Strategy 2: requestLEScan (general BLE scan that exposes adv data)
+    // Both require chrome://flags/#enable-experimental-web-platform-features
+
+    // Try watchAdvertisements first (watches the specific selected device)
+    if (this.device.watchAdvertisements) {
+      const sn = await this._watchForSN();
+      if (sn) return sn;
+    }
+
+    return null;
+  }
+
+  async _watchForSN() {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        this.log('[SN] watchAdvertisements timed out (10s) — no advertisement received', 'info');
+        try { this.device.unwatchAdvertisements(); } catch {}
+        resolve(null);
+      }, 10000);
+
+      this.device.addEventListener('advertisementreceived', (event) => {
+        clearTimeout(timeout);
+        this.log(`[SN] Advertisement received from ${event.device.name || 'unknown'}`, 'info');
+
+        // Log all available advertisement data
+        if (event.manufacturerData) {
+          this.log(`[SN] manufacturerData keys: [${[...event.manufacturerData.keys()].map(k => '0x' + k.toString(16)).join(', ')}]`, 'info');
+          for (const [companyId, dataView] of event.manufacturerData) {
+            const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+            this.log(`[SN] companyId=0x${companyId.toString(16)}, data (${bytes.length}B): ${hexBytes(bytes)}`, 'info');
+          }
+        } else {
+          this.log('[SN] No manufacturerData in advertisement', 'info');
+        }
+
+        if (event.serviceData) {
+          this.log(`[SN] serviceData keys: [${[...event.serviceData.keys()].join(', ')}]`, 'info');
+        }
+
+        this.log(`[SN] rssi=${event.rssi}, txPower=${event.txPower}, name=${event.name}`, 'info');
+
+        try { this.device.unwatchAdvertisements(); } catch {}
+        const sn = this._parseSNFromManufacturerData(event.manufacturerData);
+        this.log(`[SN] Parsed SN: ${sn || 'null'}`, sn ? 'success' : 'error');
+        resolve(sn);
+      }, { once: true });
+
+      this.log(`[SN] Calling watchAdvertisements() on device: ${this.device.name}...`, 'info');
+      this.device.watchAdvertisements().then(() => {
+        this.log('[SN] watchAdvertisements() started OK', 'info');
+      }).catch((e) => {
+        this.log(`[SN] watchAdvertisements() failed: ${e.message}`, 'error');
+        clearTimeout(timeout);
+        resolve(null);
+      });
+    });
+  }
+
+  _parseSNFromManufacturerData(mfData) {
+    if (mfData && mfData.has(0xB5B5)) {
+      const data = new Uint8Array(mfData.get(0xB5B5).buffer);
+      if (data.length >= 17) {
+        return new TextDecoder().decode(data.slice(1, 17)).replace(/\0+$/, '');
+      }
+    }
+    return null;
+  }
+
+  async _findCharacteristics() {
+    const NUS_WRITE = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+    const NUS_NOTIFY = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+    const RFCOMM_WRITE = '00000002-0000-1000-8000-00805f9b34fb';
+    const RFCOMM_NOTIFY = '00000003-0000-1000-8000-00805f9b34fb';
+
+    const services = await this.server.getPrimaryServices();
+    this.log(`Found ${services.length} service(s)`, 'info');
+
+    for (const service of services) {
+      try {
+        const chars = await service.getCharacteristics();
+        for (const c of chars) {
+          if (c.uuid === NUS_WRITE || c.uuid === RFCOMM_WRITE) {
+            this.writeChar = c;
+            this.log(`Found write characteristic: ${c.uuid}`, 'info');
+          }
+          if (c.uuid === NUS_NOTIFY || c.uuid === RFCOMM_NOTIFY) {
+            this.notifyChar = c;
+            this.log(`Found notify characteristic: ${c.uuid}`, 'info');
+          }
+        }
+      } catch (e) {
+        // Skip services we can't read
+      }
+    }
+
+    if (!this.writeChar || !this.notifyChar) {
+      throw new Error('Could not find BLE write/notify characteristics');
+    }
+  }
+
+  async _writeData(data) {
+    const MAX_MTU = 512;
+    for (let i = 0; i < data.length; i += MAX_MTU) {
+      const chunk = data.slice(i, Math.min(i + MAX_MTU, data.length));
+      await this.writeChar.writeValueWithResponse(chunk);
+    }
+  }
+
+  async _writeDataNoResponse(data) {
+    const MAX_MTU = 512;
+    for (let i = 0; i < data.length; i += MAX_MTU) {
+      const chunk = data.slice(i, Math.min(i + MAX_MTU, data.length));
+      await this.writeChar.writeValueWithoutResponse(chunk);
+    }
+  }
+
+  _waitForNotify(timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Notification timeout'));
+      }, timeout);
+
+      this._resolveNotify = (data) => {
+        clearTimeout(timer);
+        resolve(data);
+      };
+    });
+  }
+
+  _onNotifyRaw(event) {
+    const data = new Uint8Array(event.target.value.buffer);
+    if (this._resolveNotify) {
+      const resolve = this._resolveNotify;
+      this._resolveNotify = null;
+      resolve(data);
+    }
+  }
+
+  async _ecdhKeyExchange() {
+    // Generate SECP160r1 key pair — use random bytes directly since
+    // elliptic's genKeyPair() needs a real hash for HMAC-DRBG which
+    // our stub doesn't provide
+    const privBytes = new Uint8Array(20);
+    crypto.getRandomValues(privBytes);
+    const keyPair = secp160r1.keyFromPrivate(privBytes);
+
+    // Get raw public key bytes (X || Y, no 0x04 prefix)
+    const pubX = keyPair.getPublic().getX().toArrayLike(Uint8Array, 'be', 20);
+    const pubY = keyPair.getPublic().getY().toArrayLike(Uint8Array, 'be', 20);
+    const pubKeyBytes = new Uint8Array(40);
+    pubKeyBytes.set(pubX, 0);
+    pubKeyBytes.set(pubY, 20);
+
+    // Build payload: 0x01 0x00 + public key
+    const payload = new Uint8Array(2 + pubKeyBytes.length);
+    payload[0] = 0x01;
+    payload[1] = 0x00;
+    payload.set(pubKeyBytes, 2);
+
+    const frame = SimplePacketAssembler.encode(payload);
+
+    // Set up notification listener
+    this._notifyHandler = this._onNotifyRaw.bind(this);
+    await this.notifyChar.startNotifications();
+    this.notifyChar.addEventListener('characteristicvaluechanged', this._notifyHandler);
+
+    // Send and wait for response
+    this.log(`[ECDH] TX frame (${frame.length}B): ${hexBytes(frame)}`, 'info');
+    const notifyPromise = this._waitForNotify();
+    await this._writeData(frame);
+    this.log('[ECDH] Sent public key, waiting for device response...', 'info');
+
+    const response = await notifyPromise;
+    this.log(`[ECDH] RX raw (${response.length}B): ${hexBytes(response)}`, 'info');
+
+    const parsed = this.simpleAssembler.parse(response);
+    this.log(`[ECDH] Parsed payload (${parsed ? parsed.length + 'B' : 'null'}): ${parsed ? hexBytes(parsed) : 'null'}`, 'info');
+
+    if (!parsed || parsed.length < 3) {
+      throw new Error('Invalid ECDH response: ' + (parsed ? hexBytes(parsed) : 'null'));
+    }
+
+    // Parse device public key
+    const ecdhType = parsed[2];
+    const ecdhTypeSize = getEcdhTypeSize(ecdhType);
+    const devPubKeyBytes = parsed.slice(3, 3 + ecdhTypeSize);
+    this.log(`[ECDH] Device pubkey: type=${ecdhType}, size=${ecdhTypeSize}, bytes=${hexBytes(devPubKeyBytes)}`, 'success');
+
+    // Parse the device public key
+    const coordSize = ecdhTypeSize / 2;
+    const devPubKey = secp160r1.keyFromPublic({
+      x: Array.from(devPubKeyBytes.slice(0, coordSize)).map(b => hex(b).toLowerCase()).join(''),
+      y: Array.from(devPubKeyBytes.slice(coordSize)).map(b => hex(b).toLowerCase()).join('')
+    });
+
+    // Derive shared secret
+    const sharedPoint = keyPair.derive(devPubKey.getPublic());
+    const sharedBytes = sharedPoint.toArrayLike(Uint8Array, 'be', coordSize);
+    this.log(`[ECDH] Shared secret (${sharedBytes.length}B): ${hexBytes(sharedBytes)}`, 'info');
+
+    // Shared key = first 16 bytes, IV = MD5(full shared secret)
+    const sharedKey = sharedBytes.slice(0, 16);
+    const iv = md5(sharedBytes);
+    this.log(`[ECDH] AES key: ${hexBytes(sharedKey)}`, 'info');
+    this.log(`[ECDH] AES IV:  ${hexBytes(iv)}`, 'info');
+
+    this.crypto = new AESCrypto(sharedKey, iv);
+    this.log('[ECDH] Key exchange complete', 'success');
+
+    // Continue to get key info
+    await this._getKeyInfo();
+  }
+
+  async _getKeyInfo() {
+    this.log('[KeyInfo] Requesting session key...', 'info');
+
+    const frame = SimplePacketAssembler.encode(new Uint8Array([0x02]));
+    this.log(`[KeyInfo] TX frame (${frame.length}B): ${hexBytes(frame)}`, 'info');
+    const notifyPromise = this._waitForNotify();
+    await this._writeData(frame);
+
+    const response = await notifyPromise;
+    this.log(`[KeyInfo] RX raw (${response.length}B): ${hexBytes(response)}`, 'info');
+
+    const parsed = this.simpleAssembler.parse(response);
+    this.log(`[KeyInfo] Parsed payload (${parsed ? parsed.length + 'B' : 'null'}): ${parsed ? hexBytes(parsed) : 'null'}`, 'info');
+
+    if (!parsed || parsed[0] !== 0x02) {
+      throw new Error('Invalid KeyInfo response: ' + (parsed ? hexBytes(parsed) : 'null'));
+    }
+
+    // Decrypt the encrypted portion (skip first byte which is the type 0x02)
+    const encrypted = parsed.slice(1);
+    this.log(`[KeyInfo] Encrypted data (${encrypted.length}B): ${hexBytes(encrypted)}`, 'info');
+
+    const decrypted = await this.crypto.decrypt(encrypted);
+    this.log(`[KeyInfo] Decrypted data (${decrypted.length}B): ${hexBytes(decrypted)}`, 'info');
+
+    // Parse: srand (first 16 bytes) + seed (last 2 bytes)
+    const srand = decrypted.slice(0, 16);
+    const seed = decrypted.slice(16, 18);
+    this.log(`[KeyInfo] srand: ${hexBytes(srand)}`, 'info');
+    this.log(`[KeyInfo] seed: ${hexBytes(seed)}`, 'info');
+
+    // Generate session key
+    const sessionKey = genSessionKey(seed, srand);
+    this.log(`[KeyInfo] Session key: ${hexBytes(sessionKey)}`, 'info');
+
+    this.crypto = new AESCrypto(sessionKey, this.crypto.ivBytes);
+    this.encAssembler = new EncPacketAssembler(this.crypto);
+    this.log('[KeyInfo] Session key derived', 'success');
+
+    // Stop temporary notification handler, proceed to auth
+    await this._getAuthStatus();
+  }
+
+  async _getAuthStatus() {
+    this.log('[AuthStatus] Sending auth status request...', 'info');
+
+    const packet = new Packet(0x21, this.authHeaderDst, 0x35, 0x89,
+      new Uint8Array(0), 0x01, 0x01, this.packetVersion);
+    this.log(`[AuthStatus] Packet: ${packet.toString()}`, 'info');
+    await this._sendEncPacket(packet);
+
+    const response = await this._waitForNotify();
+    this.log(`[AuthStatus] RX raw (${response.length}B): ${hexBytes(response)}`, 'info');
+
+    const payloads = await this.encAssembler.reassemble(response);
+    this.log(`[AuthStatus] Decrypted ${payloads.length} payload(s)`, 'info');
+
+    if (payloads.length > 0) {
+      this.log(`[AuthStatus] Payload[0] (${payloads[0].length}B): ${hexBytes(payloads[0])}`, 'info');
+      const pkt = Packet.fromBytes(payloads[0]);
+      if (pkt) {
+        this.log(`[AuthStatus] Response packet: ${pkt.toString()}`, 'info');
+      } else {
+        this.log(`[AuthStatus] Failed to parse inner packet`, 'error');
+      }
+    }
+
+    await this._authenticate();
+  }
+
+  async _authenticate() {
+    const userId = document.getElementById('user-id').value.trim();
+    if (!userId) {
+      this.log('Error: User ID is required for authentication', 'error');
+      this.setStatus('Error: No User ID', 'error');
+      return;
+    }
+
+    if (!this.serialNumber) {
+      this.log('Error: Serial number is required for authentication', 'error');
+      this.setStatus('Error: No Serial Number', 'error');
+      return;
+    }
+
+    this.log(`[Auth] userId="${userId}", serialNumber="${this.serialNumber}"`, 'info');
+
+    // Build auth payload: MD5(userId + serialNumber).toUpperCase() as ASCII
+    const authStr = userId + this.serialNumber;
+    this.log(`[Auth] MD5 input: "${authStr}" (${authStr.length} chars)`, 'info');
+
+    const md5Hash = md5(new TextEncoder().encode(authStr));
+    const md5Hex = Array.from(md5Hash, b => hex(b)).join(''); // Already uppercase from hex()
+    this.log(`[Auth] MD5 hash: ${md5Hex}`, 'info');
+
+    const authPayload = new TextEncoder().encode(md5Hex);
+    this.log(`[Auth] Auth payload (${authPayload.length}B): ${hexBytes(authPayload)}`, 'info');
+
+    const packet = new Packet(0x21, this.authHeaderDst, 0x35, 0x86,
+      authPayload, 0x01, 0x01, this.packetVersion);
+    this.log(`[Auth] Packet: ${packet.toString()}`, 'info');
+
+    // Remove the temporary handler and switch to persistent listener
+    this.notifyChar.removeEventListener('characteristicvaluechanged', this._notifyHandler);
+    this._notifyHandler = this._onDataHandler.bind(this);
+    this.notifyChar.addEventListener('characteristicvaluechanged', this._notifyHandler);
+
+    await this._sendEncPacket(packet);
+    this.addPacket(packet, 'TX');
+
+    this.setStatus('Connected', 'connected');
+    this.log('Authentication sent. Listening for data...', 'success');
+    document.getElementById('btn-disconnect').disabled = false;
+    this._updateConnectionHints();
+  }
+
+  async _sendEncPacket(packet) {
+    const packetBytes = packet.toBytes();
+    const encrypted = await this.crypto.encrypt(packetBytes);
+    const frame = encPacketEncode(0x01, encrypted);
+    await this._writeData(frame);
+  }
+
+  async _onDataHandler(event) {
+    const data = new Uint8Array(event.target.value.buffer);
+    try {
+      const payloads = await this.encAssembler.reassemble(data);
+      for (const payload of payloads) {
+        const packet = Packet.fromBytes(payload);
+        if (packet) {
+          this.addPacket(packet, 'RX');
+
+          // Check if this is an auth response
+          if (packet.cmdSet === 0x35 && packet.cmdId === 0x86) {
+            const AUTH_ERRORS = {
+              0x00: 'Success',
+              0x01: 'General error',
+              0x02: 'OTA upgrade in progress',
+              0x03: 'User ID incorrect length',
+              0x04: 'IOT status error',
+              0x05: 'User key read error',
+              0x06: 'Incorrect user ID',
+              0x07: 'Maximum devices reached',
+            };
+            const code = packet.payload.length > 0 ? packet.payload[0] : -1;
+            const msg = AUTH_ERRORS[code] || `Unknown error (0x${hex(code)})`;
+            if (code === 0x00) {
+              this.log(`Authentication successful`, 'success');
+            } else {
+              this.log(`Authentication failed: ${msg}. Check your User ID and Serial Number.`, 'error');
+            }
+            // Never reply to auth packets
+            continue;
+          }
+
+          // Reply packets if enabled (needed to get full device data)
+          // Skip auth-related command set (0x35)
+          if (document.getElementById('auto-reply').checked && packet.cmdSet !== 0x35) {
+            await this._replyPacket(packet);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Data handler error:', e);
+    }
+  }
+
+  async _replyPacket(packet) {
+    const reply = new Packet(
+      packet.dst,  // Swap src/dst
+      packet.src,
+      packet.cmdSet,
+      packet.cmdId,
+      packet.payload,
+      0x01,
+      0x01,
+      packet.version,
+      packet.seq,
+      packet.productId
+    );
+
+    try {
+      await this._sendEncPacket(reply);
+      this.addPacket(reply, 'TX');
+    } catch (e) {
+      console.error('Reply failed:', e);
+    }
+  }
+
+  addPacket(packet, direction) {
+    const idx = this.packetCounter++;
+    const entry = {
+      idx,
+      time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 }),
+      direction,
+      packet,
+      rawPayload: packet.payload
+    };
+    this.packets.push(entry);
+
+    // Enforce max size — remove oldest entries
+    const max = parseInt(document.getElementById('max-packets').value) || 100;
+    while (this.packets.length > max) {
+      const removed = this.packets.shift();
+      // Remove the corresponding table row
+      const row = document.querySelector(`#packet-tbody tr[data-idx="${removed.idx}"]`);
+      if (row) row.remove();
+    }
+
+    // Check filter
+    if (!this._matchesFilter(packet)) return;
+
+    this._addPacketRow(entry);
+    document.getElementById('packet-count').textContent = `${this.packets.length} packets`;
+
+    // Auto-refresh timeline if live mode is on and timeline tab is active
+    if (document.getElementById('tl-auto-refresh')?.checked &&
+        document.getElementById('view-timeline')?.classList.contains('active')) {
+      this.refreshTimeline();
+    }
+  }
+
+  _matchesFilter(packet) {
+    const csFilter = document.getElementById('filter-cmdset').value.trim();
+    const ciFilter = document.getElementById('filter-cmdid').value.trim();
+
+    if (csFilter) {
+      const val = parseInt(csFilter, 16);
+      if (!isNaN(val) && packet.cmdSet !== val) return false;
+    }
+    if (ciFilter) {
+      const val = parseInt(ciFilter, 16);
+      if (!isNaN(val) && packet.cmdId !== val) return false;
+    }
+    return true;
+  }
+
+  _packetCellData(entry) {
+    const { idx, time, direction, packet } = entry;
+    const dirClass = direction === 'TX' ? 'dir-tx' : 'dir-rx';
+    const seqHex = Array.from(packet.seq).map(b => hex(b)).join('');
+    return {
+      '#': `${idx}`,
+      'Time': `${time}`,
+      'Dir': `<span class="${dirClass}">${direction}</span>`,
+      'Ver': `0x${hex(packet.version)}`,
+      'Src': `0x${hex(packet.src)}`,
+      'Dst': `0x${hex(packet.dst)}`,
+      'dSrc': `0x${hex(packet.dsrc)}`,
+      'dDst': `0x${hex(packet.ddst)}`,
+      'CmdSet': `0x${hex(packet.cmdSet)}`,
+      'CmdId': `0x${hex(packet.cmdId)}`,
+      'Len': `${packet.payload.length}`,
+      'Seq': `${seqHex}`,
+    };
+  }
+
+  _getPacketColumnOrder() {
+    return this._packetColumnOrder;
+  }
+
+  _rebuildPacketTableHeaders() {
+    const headerRow = document.querySelector('#packet-log thead tr');
+    headerRow.innerHTML = '';
+    for (const col of this._packetColumnOrder) {
+      const th = document.createElement('th');
+      th.dataset.col = col;
+      th.textContent = col;
+      th.style.cursor = 'grab';
+      headerRow.appendChild(th);
+    }
+    // Re-init resize handles and reorder handlers
+    const table = document.querySelector('#packet-log table');
+    if (window._makeColumnsResizable) window._makeColumnsResizable(table);
+  }
+
+  _addPacketRow(entry) {
+    const tbody = document.getElementById('packet-tbody');
+    const tr = document.createElement('tr');
+    tr.dataset.idx = entry.idx;
+
+    const cellData = this._packetCellData(entry);
+    const colOrder = this._getPacketColumnOrder();
+
+    for (const col of colOrder) {
+      const td = document.createElement('td');
+      td.innerHTML = cellData[col] || '';
+      tr.appendChild(td);
+    }
+
+    tr.addEventListener('click', () => this._selectPacket(entry.idx));
+    tbody.insertBefore(tr, tbody.firstChild);
+
+    if (document.getElementById('auto-scroll').checked) {
+      const log = document.getElementById('packet-log');
+      log.scrollTop = 0;
+    }
+  }
+
+  _selectPacket(idx) {
+    this.selectedIdx = idx;
+
+    // Highlight row
+    document.querySelectorAll('#packet-tbody tr').forEach(tr => {
+      tr.classList.toggle('selected', parseInt(tr.dataset.idx) === idx);
+    });
+
+    // Show hex dump + proto decode
+    const entry = this.packets.find(p => p.idx === idx);
+    if (entry) {
+      document.getElementById('hex-dump').innerHTML = this._formatHexDump(entry.rawPayload);
+      this.decodeSelectedPacket();
+    }
+
+    // Hint: if no proto file selected, highlight proto dropdown
+    this._updateProtoHints();
+  }
+
+  _updateConnectionHints() {
+    const loginBtn = document.getElementById('btn-login');
+    const snInput = document.getElementById('serial-number');
+    const scanBtn = document.getElementById('btn-scan');
+    const userId = document.getElementById('user-id').value.trim();
+    const sn = snInput.value.trim();
+
+    loginBtn.classList.remove('hint');
+    snInput.classList.remove('hint');
+    scanBtn.classList.remove('hint');
+
+    if (!userId) {
+      loginBtn.classList.add('hint');
+    } else if (!sn) {
+      snInput.classList.add('hint');
+    } else if (!this.server || !this.server.connected) {
+      scanBtn.classList.add('hint');
+    }
+  }
+
+  _updateProtoHints() {
+    const protoFile = document.getElementById('proto-file');
+    const protoMsg = document.getElementById('proto-msg');
+    const timelineTab = document.querySelectorAll('#payload-tabs button')[1];
+
+    protoFile.classList.remove('hint');
+    protoMsg.classList.remove('hint');
+    timelineTab.classList.remove('hint');
+
+    if (this.selectedIdx >= 0 && !protoFile.value) {
+      // Packet selected but no proto — hint the proto dropdown
+      protoFile.classList.add('hint');
+    } else if (protoFile.value && protoMsg.options.length > 0 && protoMsg.value === '__try_all__') {
+      // Proto loaded but still on "try all" — hint the message dropdown
+      protoMsg.classList.add('hint');
+    } else if (protoFile.value && protoMsg.value && protoMsg.value !== '__try_all__'
+        && !document.getElementById('view-timeline').classList.contains('active')) {
+      // Specific message selected but timeline not open — hint the timeline tab
+      timelineTab.classList.add('hint');
+    }
+  }
+
+  xorPayload() {
+    if (this.selectedIdx < 0) return;
+    const entry = this.packets.find(p => p.idx === this.selectedIdx);
+    if (!entry) return;
+    const seq0 = entry.packet.seq[0];
+    if (seq0 === 0) {
+      this.log('seq[0] is 0x00 — XOR would have no effect', 'info');
+      return;
+    }
+    // Toggle XOR on the displayed payload
+    entry._xored = !entry._xored;
+    if (entry._xored) {
+      entry._displayPayload = entry.rawPayload.map(b => b ^ seq0);
+      this.log(`Payload XOR'd with 0x${hex(seq0)}`, 'info');
+    } else {
+      entry._displayPayload = entry.rawPayload;
+      this.log('Payload XOR removed (showing original)', 'info');
+    }
+    document.getElementById('hex-dump').innerHTML = this._formatHexDump(entry._displayPayload);
+    this.decodeSelectedPacket();
+  }
+
+  _getDisplayPayload(entry) {
+    return entry._displayPayload || entry.rawPayload;
+  }
+
+  copyPayload() {
+    if (this.selectedIdx < 0) return;
+    const entry = this.packets.find(p => p.idx === this.selectedIdx);
+    if (!entry) return;
+    const payload = this._getDisplayPayload(entry);
+    const hexStr = Array.from(payload, b => b.toString(16).padStart(2, '0')).join('');
+    navigator.clipboard.writeText(hexStr).then(() => this.log('Payload hex copied to clipboard', 'info'));
+  }
+
+  copyRawPacket() {
+    if (this.selectedIdx < 0) return;
+    const entry = this.packets.find(p => p.idx === this.selectedIdx);
+    if (!entry) return;
+    const raw = entry.packet.toBytes();
+    const hex = Array.from(raw, b => b.toString(16).padStart(2, '0')).join('');
+    navigator.clipboard.writeText(hex).then(() => this.log('Raw packet hex copied to clipboard', 'info'));
+  }
+
+  _formatHexDump(data) {
+    if (!data || data.length === 0) return '<span class="hex-offset">Empty payload</span>';
+
+    const lines = [];
+    for (let i = 0; i < data.length; i += 16) {
+      const chunk = data.slice(i, Math.min(i + 16, data.length));
+
+      const offsetStr = `<span class="hex-offset">${i.toString(16).padStart(8, '0')}</span>`;
+
+      const hexParts = [];
+      for (let j = 0; j < 16; j++) {
+        if (j < chunk.length) {
+          hexParts.push(`<span class="hex-byte">${hex(chunk[j])}</span>`);
+        } else {
+          hexParts.push('  ');
+        }
+        if (j === 7) hexParts.push(' ');
+      }
+      const hexStr = hexParts.join(' ');
+
+      let asciiStr = '';
+      for (let j = 0; j < chunk.length; j++) {
+        const c = chunk[j];
+        asciiStr += (c >= 0x20 && c <= 0x7E) ? String.fromCharCode(c) : '.';
+      }
+      const asciiHtml = `<span class="hex-ascii">${escapeHtml(asciiStr)}</span>`;
+
+      lines.push(`${offsetStr}  ${hexStr}  ${asciiHtml}`);
+    }
+    return lines.join('\n');
+  }
+
+  // ===========================================================================
+  // Protobuf
+  // ===========================================================================
+
+  _initProtoSelector() {
+    const select = document.getElementById('proto-file');
+    if (typeof PROTO_FILES !== 'undefined') {
+      for (const name of Object.keys(PROTO_FILES).sort()) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name.replace('.proto', '');
+        select.appendChild(opt);
+      }
+    }
+  }
+
+  async onProtoFileChange() {
+    const fileName = document.getElementById('proto-file').value;
+    const msgSelect = document.getElementById('proto-msg');
+    msgSelect.innerHTML = '';
+    this._protoRoot = null;
+    this._protoMessages = [];
+    this._tlPinnedFields = null; // reset pins on proto change
+    this._tlColumnOrder = null;
+    this._tlRows = null;
+    this._tlAllFields = null;
+    this._tlChangedFields = null;
+
+    if (!fileName) {
+      document.getElementById('proto-decoded').textContent = '';
+      return;
+    }
+
+    try {
+      const content = PROTO_FILES[fileName];
+      this._protoRoot = protobuf.parse(content, { keepCase: true }).root;
+      this._protoMessages = this._collectMessages(this._protoRoot);
+
+      for (const name of this._protoMessages) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        msgSelect.appendChild(opt);
+      }
+
+      // Add "Try all" option at the top
+      const tryAll = document.createElement('option');
+      tryAll.value = '__try_all__';
+      tryAll.textContent = '(try all messages)';
+      msgSelect.insertBefore(tryAll, msgSelect.firstChild);
+      msgSelect.value = '__try_all__';
+
+      this.log(`Loaded ${fileName}: ${this._protoMessages.length} message type(s)`, 'success');
+      this.decodeSelectedPacket();
+      this._updateProtoHints();
+    } catch (e) {
+      this.log(`Failed to parse ${fileName}: ${e.message}`, 'error');
+    }
+  }
+
+  _collectMessages(namespace, prefix = '') {
+    const messages = [];
+    if (namespace.nested) {
+      for (const [name, obj] of Object.entries(namespace.nested)) {
+        const fullName = prefix ? prefix + '.' + name : name;
+        if (obj instanceof protobuf.Type) {
+          messages.push(fullName);
+        }
+        if (obj.nested) {
+          messages.push(...this._collectMessages(obj, fullName));
+        }
+      }
+    }
+    return messages;
+  }
+
+  selectMsgType(name) {
+    const select = document.getElementById('proto-msg');
+    if (select.querySelector(`option[value="${name}"]`)) {
+      select.value = name;
+      this.onMsgTypeChange();
+    }
+  }
+
+  onMsgTypeChange() {
+    this._tlPinnedFields = null; // reset pins on message change
+    this._tlColumnOrder = null; // reset column order on message change
+    this.decodeSelectedPacket();
+    this._updateProtoHints();
+    if (document.getElementById('view-timeline').classList.contains('active')) {
+      this.refreshTimeline();
+    }
+  }
+
+  showCustomProto() {
+    document.getElementById('custom-proto-overlay').classList.add('visible');
+    document.getElementById('custom-proto-error').textContent = '';
+  }
+
+  loadCustomProto() {
+    const text = document.getElementById('custom-proto-text').value.trim();
+    if (!text) return;
+
+    try {
+      this._protoRoot = protobuf.parse(text, { keepCase: true }).root;
+      this._protoMessages = this._collectMessages(this._protoRoot);
+
+      const msgSelect = document.getElementById('proto-msg');
+      msgSelect.innerHTML = '';
+
+      const tryAll = document.createElement('option');
+      tryAll.value = '__try_all__';
+      tryAll.textContent = '(try all messages)';
+      msgSelect.appendChild(tryAll);
+
+      for (const name of this._protoMessages) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        msgSelect.appendChild(opt);
+      }
+
+      // Set proto-file dropdown to show custom
+      const fileSelect = document.getElementById('proto-file');
+      let customOpt = fileSelect.querySelector('option[value="__custom__"]');
+      if (!customOpt) {
+        customOpt = document.createElement('option');
+        customOpt.value = '__custom__';
+        customOpt.textContent = '(custom)';
+        fileSelect.appendChild(customOpt);
+      }
+      fileSelect.value = '__custom__';
+
+      document.getElementById('custom-proto-overlay').classList.remove('visible');
+      this.log(`Loaded custom proto: ${this._protoMessages.length} message type(s)`, 'success');
+      this.decodeSelectedPacket();
+    } catch (e) {
+      document.getElementById('custom-proto-error').textContent = e.message;
+    }
+  }
+
+  decodeSelectedPacket() {
+    if (this.selectedIdx < 0 || !this._protoRoot) {
+      document.getElementById('proto-decoded').textContent = '';
+      return;
+    }
+
+    const entry = this.packets.find(p => p.idx === this.selectedIdx);
+    if (!entry || entry.rawPayload.length === 0) {
+      document.getElementById('proto-decoded').textContent = '';
+      return;
+    }
+
+    const msgName = document.getElementById('proto-msg').value;
+    const displayPayload = this._getDisplayPayload(entry);
+
+    // Also prepare XOR'd variant for auto-try (if not already XOR'd manually)
+    const seq0 = entry.packet.seq[0];
+    const xorPayload = (seq0 !== 0 && !entry._xored)
+      ? displayPayload.map(b => b ^ seq0)
+      : null;
+
+    if (msgName === '__try_all__') {
+      this._tryAllMessages(displayPayload, xorPayload, seq0);
+    } else {
+      this._decodeSingle(msgName, displayPayload, xorPayload, seq0);
+    }
+  }
+
+  _tryDecode(MsgType, data) {
+    try {
+      const decoded = MsgType.decode(data);
+      const obj = MsgType.toObject(decoded, { longs: String, enums: String, defaults: false });
+      if (Object.keys(obj).length === 0) return null;
+      return obj;
+    } catch {
+      return null;
+    }
+  }
+
+  _tryAllMessages(payload, xorPayload, seq0) {
+    const el = document.getElementById('proto-decoded');
+    const results = [];
+
+    for (const name of this._protoMessages) {
+      const MsgType = this._protoRoot.lookupType(name);
+
+      const obj = this._tryDecode(MsgType, payload);
+      if (obj) {
+        results.push({ name, obj, xored: false });
+      }
+
+      if (xorPayload) {
+        const xorObj = this._tryDecode(MsgType, xorPayload);
+        if (xorObj) {
+          results.push({ name, obj: xorObj, xored: true });
+        }
+      }
+    }
+
+    if (results.length === 0) {
+      el.innerHTML = '<span class="proto-err">No message types matched this payload</span>';
+    } else {
+      el.innerHTML = results.map(r => {
+        const tag = r.xored ? ` <span class="proto-err">[XOR 0x${hex(seq0)}]</span>` : '';
+        return `<span class="proto-msg-link" onclick="app.selectMsgType('${escapeHtml(r.name)}')">${escapeHtml(r.name)}</span>${tag}\n` +
+          this._formatProtoObj(r.obj, 1);
+      }).join('\n\n');
+    }
+  }
+
+  _decodeSingle(msgName, payload, xorPayload, seq0) {
+    const el = document.getElementById('proto-decoded');
+    const MsgType = this._protoRoot.lookupType(msgName);
+    const parts = [];
+
+    const obj = this._tryDecode(MsgType, payload);
+    if (obj) {
+      parts.push(`<span class="proto-msg-link" onclick="app.selectMsgType('${escapeHtml(msgName)}')">${escapeHtml(msgName)}</span>\n` +
+        this._formatProtoObj(obj, 1));
+    }
+
+    if (xorPayload) {
+      const xorObj = this._tryDecode(MsgType, xorPayload);
+      if (xorObj) {
+        parts.push(`<span class="proto-msg-link" onclick="app.selectMsgType('${escapeHtml(msgName)}')">${escapeHtml(msgName)}</span> <span class="proto-err">[XOR 0x${hex(seq0)}]</span>\n` +
+          this._formatProtoObj(xorObj, 1));
+      }
+    }
+
+    if (parts.length === 0) {
+      el.innerHTML = `<span class="proto-err">Decode failed for both original and XOR'd payload</span>`;
+    } else {
+      el.innerHTML = parts.join('\n\n');
+    }
+  }
+
+  // ===========================================================================
+  // Timeline view
+  // ===========================================================================
+
+  switchPayloadTab(tab) {
+    document.querySelectorAll('#payload-tabs button').forEach(b => b.classList.remove('active'));
+    document.getElementById('view-packet').classList.remove('active');
+    document.getElementById('view-timeline').classList.remove('active');
+
+    if (tab === 'timeline') {
+      document.querySelectorAll('#payload-tabs button')[1].classList.add('active');
+      document.getElementById('view-timeline').classList.add('active');
+      this.refreshTimeline();
+    } else {
+      document.querySelectorAll('#payload-tabs button')[0].classList.add('active');
+      document.getElementById('view-packet').classList.add('active');
+    }
+    this._updateProtoHints();
+  }
+
+  refreshTimeline() {
+    const wrap = document.getElementById('timeline-wrap');
+    const msgName = document.getElementById('proto-msg').value;
+
+    if (!this._protoRoot || !msgName || msgName === '__try_all__') {
+      wrap.innerHTML = '<div id="timeline-empty">Select a specific message type (not "try all") to view timeline</div>';
+      return;
+    }
+
+    const MsgType = this._protoRoot.lookupType(msgName);
+    const dirFilter = document.getElementById('tl-direction').value;
+
+    // Decode all matching packets
+    const rows = [];
+    for (const entry of this.packets) {
+      if (dirFilter && entry.direction !== dirFilter) continue;
+
+      const payload = this._getDisplayPayload(entry);
+      const seq0 = entry.packet.seq[0];
+
+      let obj = this._tryDecode(MsgType, payload);
+      let xored = false;
+      if (!obj && seq0 !== 0) {
+        const xorPayload = payload.map(b => b ^ seq0);
+        obj = this._tryDecode(MsgType, xorPayload);
+        xored = !!obj;
+      }
+
+      if (obj) {
+        const fields = this._flattenObj(obj);
+        // Compute field signature: sorted list of non-empty field names
+        const sig = Object.keys(fields).filter(k => fields[k] !== '' && fields[k] != null).sort().join('|');
+        rows.push({
+          idx: entry.idx,
+          time: entry.time,
+          direction: entry.direction,
+          xored,
+          fields,
+          sig,
+        });
+      }
+    }
+
+    // Store rows and fields for chip rendering
+    this._tlRows = rows;
+
+    // Collect all field names
+    const allFields = new Set();
+    for (const row of rows) {
+      for (const key of Object.keys(row.fields)) allFields.add(key);
+    }
+    this._tlAllFields = [...allFields].sort();
+
+    // For each row, find the previous row with the SAME field signature
+    // and compute per-field changes against that (not just the previous row)
+    this._tlChangedFields = new Set();
+    const lastBySig = new Map(); // sig → row index
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const prevIdx = lastBySig.get(row.sig);
+      if (prevIdx !== undefined) {
+        const prev = rows[prevIdx];
+        row._prevSameShape = prev;
+        for (const f of Object.keys(row.fields)) {
+          if (String(row.fields[f] ?? '') !== String(prev.fields[f] ?? '')) {
+            this._tlChangedFields.add(f);
+          }
+        }
+      } else {
+        row._prevSameShape = null;
+      }
+      lastBySig.set(row.sig, i);
+    }
+
+    // Initialize pinned fields if not set (default to changed fields, or all if few)
+    if (!this._tlPinnedFields) {
+      this._tlPinnedFields = new Set(
+        this._tlChangedFields.size > 0 ? this._tlChangedFields : this._tlAllFields
+      );
+    }
+
+    this.renderFieldChips();
+    this._renderTimelineTable();
+  }
+
+  renderFieldChips() {
+    const container = document.getElementById('tl-field-chips');
+    if (!this._tlAllFields) { container.innerHTML = ''; return; }
+
+    const filter = (document.getElementById('tl-field-filter').value || '').toLowerCase();
+    const pinned = this._tlPinnedFields || new Set();
+
+    container.innerHTML = this._tlAllFields
+      .filter(f => !filter || f.toLowerCase().includes(filter))
+      .map(f => {
+        const isPinned = pinned.has(f);
+        const hasChanges = this._tlChangedFields && this._tlChangedFields.has(f);
+        const cls = ['tl-chip', isPinned ? 'pinned' : '', hasChanges ? 'has-changes' : ''].filter(Boolean).join(' ');
+        return `<span class="${cls}" onclick="app.toggleFieldPin('${escapeHtml(f)}')" title="${escapeHtml(f)}">${escapeHtml(this._shortFieldName(f))}</span>`;
+      }).join('');
+  }
+
+  toggleFieldPin(field) {
+    if (!this._tlPinnedFields) this._tlPinnedFields = new Set();
+    if (this._tlPinnedFields.has(field)) {
+      this._tlPinnedFields.delete(field);
+    } else {
+      this._tlPinnedFields.add(field);
+    }
+    this.renderFieldChips();
+    this._renderTimelineTable();
+  }
+
+  tlPinAll() {
+    this._tlPinnedFields = new Set(this._tlAllFields || []);
+    this.renderFieldChips();
+    this._renderTimelineTable();
+  }
+
+  tlPinNone() {
+    this._tlPinnedFields = new Set();
+    this.renderFieldChips();
+    this._renderTimelineTable();
+  }
+
+  tlPinChanged() {
+    this._tlPinnedFields = new Set(this._tlChangedFields || []);
+    this.renderFieldChips();
+    this._renderTimelineTable();
+  }
+
+  _renderTimelineTable() {
+    const wrap = document.getElementById('timeline-wrap');
+    const rows = this._tlRows || [];
+    const changesOnly = document.getElementById('tl-changes-only').checked;
+    const pinned = this._tlPinnedFields || new Set();
+
+    if (rows.length === 0) {
+      wrap.innerHTML = '<div id="timeline-empty">No packets matched</div>';
+      document.getElementById('tl-count').textContent = '0 matches';
+      return;
+    }
+
+    // Display only pinned fields
+    let displayFields = this._tlAllFields.filter(f => pinned.has(f));
+
+    // If "changes only" is checked, further filter to only changed fields
+    if (changesOnly) {
+      displayFields = displayFields.filter(f => this._tlChangedFields.has(f));
+    }
+
+    if (displayFields.length === 0) {
+      wrap.innerHTML = '<div id="timeline-empty">No fields selected — click field chips above to pin fields</div>';
+      document.getElementById('tl-count').textContent = `${rows.length} matches, 0 pinned`;
+      return;
+    }
+
+    // Apply user's column order if they've reordered via drag
+    if (this._tlColumnOrder && this._tlColumnOrder.length > 0) {
+      const reordered = [];
+      for (const f of this._tlColumnOrder) {
+        if (displayFields.includes(f)) reordered.push(f);
+      }
+      // Append any new fields not in saved order
+      for (const f of displayFields) {
+        if (!reordered.includes(f)) reordered.push(f);
+      }
+      displayFields = reordered;
+    }
+
+    let html = '<table><thead><tr><th data-field="#">#</th><th data-field="Time">Time</th><th data-field="Dir">Dir</th>';
+    for (const f of displayFields) {
+      html += `<th data-field="${escapeHtml(f)}" title="${escapeHtml(f)}">${escapeHtml(this._shortFieldName(f))}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    // Newest first
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+      const prev = row._prevSameShape;
+      const dirClass = row.direction === 'TX' ? 'dir-tx' : 'dir-rx';
+      const xorTag = row.xored ? ' *' : '';
+
+      html += `<tr onclick="app.selectTimelineRow(${row.idx})" class="${this.selectedIdx === row.idx ? 'selected' : ''}" title="sig: ${escapeHtml(row.sig.slice(0, 60))}...">`;
+      html += `<td>${row.idx}</td><td>${row.time}</td><td class="${dirClass}">${row.direction}${xorTag}</td>`;
+
+      for (const f of displayFields) {
+        const val = row.fields[f] ?? '';
+        const prevVal = prev ? (prev.fields[f] ?? '') : val;
+        const changed = prev && String(val) !== String(prevVal);
+        const cls = changed ? ' class="changed"' : '';
+        const fullVal = String(val ?? '');
+        html += `<td${cls} title="${escapeHtml(fullVal)}">${escapeHtml(fullVal)}</td>`;
+      }
+      html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+
+    const changedCount = displayFields.filter(f => this._tlChangedFields.has(f)).length;
+    document.getElementById('tl-count').textContent = `${rows.length} rows, ${displayFields.length} fields, ${changedCount} changing`;
+  }
+
+  selectTimelineRow(idx) {
+    this.selectedIdx = idx;
+
+    document.querySelectorAll('#packet-tbody tr').forEach(tr => {
+      tr.classList.toggle('selected', parseInt(tr.dataset.idx) === idx);
+    });
+
+    const entry = this.packets.find(p => p.idx === idx);
+    if (entry) {
+      document.getElementById('hex-dump').innerHTML = this._formatHexDump(this._getDisplayPayload(entry));
+      this.decodeSelectedPacket();
+    }
+
+    // Update row highlights without full re-render
+    document.querySelectorAll('#timeline-wrap tbody tr').forEach(tr => {
+      const rowIdx = parseInt(tr.querySelector('td')?.textContent);
+      tr.classList.toggle('selected', rowIdx === idx);
+    });
+  }
+
+  _flattenObj(obj, prefix = '') {
+    const result = {};
+    if (obj === null || obj === undefined) return result;
+    if (typeof obj !== 'object') {
+      result[prefix || 'value'] = obj;
+      return result;
+    }
+    if (obj instanceof Uint8Array) {
+      result[prefix || 'bytes'] = Array.from(obj, b => b.toString(16).padStart(2, '0')).join('');
+      return result;
+    }
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) {
+        Object.assign(result, this._flattenObj(obj[i], `${prefix}[${i}]`));
+      }
+      return result;
+    }
+    for (const [key, val] of Object.entries(obj)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (typeof val === 'object' && val !== null && !(val instanceof Uint8Array)) {
+        Object.assign(result, this._flattenObj(val, path));
+      } else if (val instanceof Uint8Array) {
+        result[path] = Array.from(val, b => b.toString(16).padStart(2, '0')).join('');
+      } else {
+        result[path] = val;
+      }
+    }
+    return result;
+  }
+
+  _shortFieldName(name) {
+    // Show last 2 segments for readability
+    const parts = name.split('.');
+    return parts.length > 2 ? '...' + parts.slice(-2).join('.') : name;
+  }
+
+  _formatFieldValue(val) {
+    if (val === null || val === undefined || val === '') return '';
+    const s = String(val);
+    return s.length > 20 ? s.slice(0, 17) + '...' : s;
+  }
+
+  _formatProtoObj(obj, indent) {
+    if (obj === null || obj === undefined) return '<span class="proto-val">null</span>';
+    if (typeof obj !== 'object') return `<span class="proto-val">${escapeHtml(String(obj))}</span>`;
+
+    const pad = '  '.repeat(indent);
+    const lines = [];
+
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) {
+        lines.push(`${pad}[${i}]: ${this._formatProtoObj(obj[i], indent + 1)}`);
+      }
+    } else {
+      for (const [key, val] of Object.entries(obj)) {
+        if (typeof val === 'object' && val !== null && !(val instanceof Uint8Array)) {
+          lines.push(`${pad}<span class="proto-key">${escapeHtml(key)}</span>:`);
+          lines.push(this._formatProtoObj(val, indent + 1));
+        } else if (val instanceof Uint8Array) {
+          lines.push(`${pad}<span class="proto-key">${escapeHtml(key)}</span>: <span class="proto-val">[${val.length}B] ${hexBytes(val)}</span>`);
+        } else {
+          lines.push(`${pad}<span class="proto-key">${escapeHtml(key)}</span>: <span class="proto-val">${escapeHtml(String(val))}</span>`);
+        }
+      }
+    }
+    return lines.join('\n');
+  }
+
+  applyMaxPackets() {
+    const max = parseInt(document.getElementById('max-packets').value) || 100;
+    while (this.packets.length > max) {
+      const removed = this.packets.shift();
+      const row = document.querySelector(`#packet-tbody tr[data-idx="${removed.idx}"]`);
+      if (row) row.remove();
+    }
+    document.getElementById('packet-count').textContent = `${this.packets.length} packets`;
+  }
+
+  clearPackets() {
+    this.packets = [];
+    this.packetCounter = 0;
+    this.selectedIdx = -1;
+    document.getElementById('packet-tbody').innerHTML = '';
+    document.getElementById('hex-dump').textContent = 'Select a packet to view payload';
+    document.getElementById('packet-count').textContent = '0 packets';
+  }
+
+  applyFilter() {
+    this._rebuildPacketTableHeaders();
+    const tbody = document.getElementById('packet-tbody');
+    tbody.innerHTML = '';
+    for (const entry of this.packets) {
+      if (this._matchesFilter(entry.packet)) {
+        this._addPacketRow(entry);
+      }
+    }
+  }
+
+  async disconnect() {
+    if (this.notifyChar && this._notifyHandler) {
+      try {
+        await this.notifyChar.stopNotifications();
+        this.notifyChar.removeEventListener('characteristicvaluechanged', this._notifyHandler);
+      } catch (e) { /* ignore */ }
+    }
+    if (this.server && this.server.connected) {
+      this.server.disconnect();
+    }
+    this.setStatus('Disconnected', '');
+    this.log('Disconnected', 'info');
+    document.getElementById('btn-scan').disabled = false;
+    document.getElementById('btn-disconnect').disabled = true;
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+const app = new App();
+window.app = app;
+
+// Check browser requirements on load
+(function checkRequirements() {
+  const checks = [];
+  let hasIssue = false;
+
+  // 1. Secure context (HTTPS or localhost)
+  const isSecure = window.isSecureContext;
+  checks.push({
+    ok: isSecure,
+    text: 'Secure context (HTTPS / localhost)',
+    fix: isSecure ? null : 'Serve this page over HTTPS or access via localhost'
+  });
+
+  // 2. Web Bluetooth API
+  const hasBT = !!navigator.bluetooth;
+  checks.push({
+    ok: hasBT,
+    text: 'Web Bluetooth API',
+    fix: hasBT ? null :
+      'Enable: <span class="req-flag">chrome://flags/#enable-web-bluetooth</span> → Enabled → Relaunch'
+  });
+
+  // 3. watchAdvertisements (needed for serial number auto-detect)
+  const hasWatch = hasBT && !!BluetoothDevice.prototype.watchAdvertisements;
+  checks.push({
+    ok: hasWatch,
+    text: 'watchAdvertisements (serial number auto-detect)',
+    fix: hasWatch ? null :
+      'Enable: <span class="req-flag">chrome://flags/#enable-experimental-web-platform-features</span> → Enabled → Relaunch<br>' +
+      'Without this you must enter the serial number manually (16 chars, from EcoFlow app or device label)'
+  });
+
+  // 4. Web Crypto API
+  const hasCrypto = !!(window.crypto && window.crypto.subtle);
+  checks.push({
+    ok: hasCrypto,
+    text: 'Web Crypto API (AES encryption)',
+    fix: hasCrypto ? null : 'Requires a modern browser with crypto.subtle support'
+  });
+
+  hasIssue = checks.some(c => !c.ok);
+
+  const container = document.getElementById('req-checks');
+  container.innerHTML = checks.map(c => {
+    const icon = c.ok ? '<span class="req-ok">✓</span>' : '<span class="req-fail">✗</span>';
+    const fix = c.fix ? `<br>&nbsp;&nbsp;→ ${c.fix}` : '';
+    return `<div>${icon} ${c.text}${fix}</div>`;
+  }).join('');
+
+  if (hasIssue) {
+    document.getElementById('requirements-banner').classList.add('visible');
+  }
+})();
+
+// Restore persisted values from localStorage
+document.getElementById('user-id').value = localStorage.getItem('ef-ble-userId') || '';
+document.getElementById('serial-number').value = localStorage.getItem('ef-ble-serialNumber') || '';
+document.getElementById('login-email').value = localStorage.getItem('ef-ble-email') || '';
+
+document.getElementById('user-id').addEventListener('change', function() {
+  localStorage.setItem('ef-ble-userId', this.value);
+  app._updateConnectionHints();
+});
+document.getElementById('user-id').addEventListener('input', function() {
+  app._updateConnectionHints();
+});
+document.getElementById('serial-number').addEventListener('change', function() {
+  localStorage.setItem('ef-ble-serialNumber', this.value);
+  app._updateConnectionHints();
+});
+document.getElementById('serial-number').addEventListener('input', function() {
+  app._updateConnectionHints();
+});
+document.getElementById('login-email').addEventListener('change', function() {
+  localStorage.setItem('ef-ble-email', this.value);
+});
+
+// Submit login on Enter key in password field
+document.getElementById('login-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') app.doLogin();
+});
+
+// Initial connection hints
+app._updateConnectionHints();
+
+// Resize handles
+(function initResizeHandles() {
+  function makeDraggable(handleEl, onDrag, direction) {
+    let startPos, startSize;
+
+    handleEl.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      handleEl.classList.add('dragging');
+      startPos = direction === 'h' ? e.clientX : e.clientY;
+      startSize = null; // set in first move
+
+      const onMouseMove = (e) => {
+        const currentPos = direction === 'h' ? e.clientX : e.clientY;
+        onDrag(currentPos - startPos, startPos, e);
+      };
+
+      const onMouseUp = () => {
+        handleEl.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      document.body.style.cursor = direction === 'h' ? 'col-resize' : 'row-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  }
+
+  // Horizontal: resize payload-detail panel width
+  const panelHandle = document.getElementById('panel-resize');
+  const payloadDetail = document.getElementById('payload-detail');
+  let panelStartWidth;
+
+  panelHandle.addEventListener('mousedown', () => {
+    panelStartWidth = payloadDetail.offsetWidth;
+  });
+
+  makeDraggable(panelHandle, (delta) => {
+    // Dragging left = bigger panel (negative delta = wider)
+    const newWidth = Math.max(0, panelStartWidth - delta);
+    payloadDetail.style.width = newWidth + 'px';
+  }, 'h');
+
+  // Vertical: resize log area height
+  const logHandle = document.getElementById('log-resize');
+  const logArea = document.getElementById('log-area');
+  let logStartHeight;
+
+  logHandle.addEventListener('mousedown', () => {
+    logStartHeight = logArea.offsetHeight;
+  });
+
+  makeDraggable(logHandle, (delta) => {
+    const newHeight = Math.max(0, logStartHeight + delta);
+    logArea.style.height = newHeight + 'px';
+  }, 'v');
+
+  // Vertical: resize field bar height
+  const fieldBarHandle = document.getElementById('field-bar-resize');
+  const fieldBar = document.getElementById('tl-field-bar');
+  let fieldBarStartHeight;
+
+  fieldBarHandle.addEventListener('mousedown', () => {
+    fieldBarStartHeight = fieldBar.offsetHeight;
+  });
+
+  makeDraggable(fieldBarHandle, (delta) => {
+    const newHeight = Math.max(0, fieldBarStartHeight + delta);
+    fieldBar.style.height = newHeight + 'px';
+  }, 'v');
+})();
+
+// Column resize for all tables
+(function initColumnResize() {
+  function lockTableLayout(table) {
+    // Snapshot current auto-sized widths and switch to fixed layout
+    if (table._layoutLocked) return;
+    const ths = table.querySelectorAll('thead th');
+    ths.forEach(th => {
+      th.style.width = th.offsetWidth + 'px';
+    });
+    table.style.tableLayout = 'fixed';
+    table.style.width = table.offsetWidth + 'px';
+    table.style.minWidth = '0';
+    table._layoutLocked = true;
+  }
+
+  function makeColumnsResizable(table) {
+    const ths = table.querySelectorAll('thead th');
+    if (ths.length === 0) return;
+
+    // Add resize handles and store original column indices
+    ths.forEach((th, i) => {
+      if (th._colIdx === undefined) th._colIdx = i;
+      if (!th.querySelector('.col-resize')) {
+        const handle = document.createElement('span');
+        handle.className = 'col-resize';
+        th.appendChild(handle);
+      }
+    });
+
+    table.querySelectorAll('.col-resize').forEach(handle => {
+      let startX, startWidth, th;
+
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        th = handle.parentElement;
+        lockTableLayout(th.closest('table'));
+        startX = e.clientX;
+        startWidth = th.offsetWidth;
+        handle.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        const onMouseMove = (e) => {
+          const newWidth = Math.max(30, startWidth + (e.clientX - startX));
+          th.style.width = newWidth + 'px';
+        };
+
+        const onMouseUp = () => {
+          handle.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      // Double-click to auto-fit column width
+      handle.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        th = handle.parentElement;
+        lockTableLayout(th.closest('table'));
+        const colIdx = Array.from(th.parentElement.children).indexOf(th);
+        const rows = table.querySelectorAll('tbody tr');
+
+        // Measure max content width across all cells in this column
+        const span = document.createElement('span');
+        span.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:inherit;padding:inherit;';
+        document.body.appendChild(span);
+
+        // Measure header text
+        span.style.font = getComputedStyle(th).font;
+        span.textContent = th.textContent.trim();
+        let maxWidth = span.offsetWidth + 20; // padding
+
+        // Measure each body cell
+        rows.forEach(tr => {
+          const td = tr.children[colIdx];
+          if (td) {
+            span.style.font = getComputedStyle(td).font;
+            span.textContent = td.textContent.trim();
+            maxWidth = Math.max(maxWidth, span.offsetWidth + 20);
+          }
+        });
+
+        document.body.removeChild(span);
+        th.style.width = Math.max(30, maxWidth) + 'px';
+      });
+    });
+
+    // Also make columns reorderable
+    makeColumnsReorderable(table);
+  }
+
+  // Standalone reorder function that also reorders body cells
+  function makeColumnsReorderable(table) {
+    const headerRow = table.querySelector('thead tr');
+    if (!headerRow) return;
+
+    Array.from(headerRow.children).forEach(th => {
+      if (th._dragReorderInit) return;
+      th._dragReorderInit = true;
+
+      th.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('col-resize')) return;
+
+        const startX = e.clientX;
+        let dragging = false;
+        const dragColKey = th.dataset.field || th.dataset.col;
+        let dropTarget = null;
+
+        const onMouseMove = (ev) => {
+          if (!dragging && Math.abs(ev.clientX - startX) < 8) return;
+
+          if (!dragging) {
+            dragging = true;
+            // Create a floating clone for drag visual
+            const rect = th.getBoundingClientRect();
+            const ghost = th.cloneNode(true);
+            ghost.id = '_drag-ghost';
+            ghost.style.cssText = `
+              position: fixed; top: ${rect.top}px; left: ${rect.left}px;
+              width: ${rect.width}px; height: ${rect.height}px;
+              background: var(--accent); color: var(--text); opacity: 0.85;
+              z-index: 9999; pointer-events: none; font: ${getComputedStyle(th).font};
+              padding: ${getComputedStyle(th).padding}; border-radius: 4px;
+              display: flex; align-items: center;
+            `;
+            document.body.appendChild(ghost);
+            th.style.opacity = '0.3';
+            document.body.style.cursor = 'grabbing';
+            document.body.style.userSelect = 'none';
+          }
+
+          // Move ghost with cursor
+          const ghost = document.getElementById('_drag-ghost');
+          if (ghost) ghost.style.left = (ev.clientX - ghost.offsetWidth / 2) + 'px';
+
+          // Find nearest drop target header
+          const currentHeaders = Array.from(headerRow.children);
+          currentHeaders.forEach(h => { h.style.borderLeft = ''; h.style.borderRight = ''; });
+
+          let bestDist = Infinity;
+          let bestHeader = null;
+          let bestBefore = true;
+
+          for (const h of currentHeaders) {
+            if (h === th) continue;
+            const rect = h.getBoundingClientRect();
+            const midX = rect.left + rect.width / 2;
+            const dist = Math.abs(ev.clientX - midX);
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestHeader = h;
+              bestBefore = ev.clientX < midX;
+            }
+          }
+
+          if (bestHeader) {
+            if (bestBefore) {
+              bestHeader.style.borderLeft = '3px solid var(--accent)';
+            } else {
+              bestHeader.style.borderRight = '3px solid var(--accent)';
+            }
+            dropTarget = { key: bestHeader.dataset.field || bestHeader.dataset.col, before: bestBefore };
+          }
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+
+          // Clear visual feedback
+          Array.from(headerRow.children).forEach(h => {
+            h.style.borderLeft = '';
+            h.style.borderRight = '';
+          });
+
+          const ghost = document.getElementById('_drag-ghost');
+          if (ghost) ghost.remove();
+          th.style.opacity = '';
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+
+          console.log('[ColDrag] dragging:', dragging, 'dropTarget:', dropTarget, 'dragColKey:', dragColKey);
+
+          if (!dragging || !dropTarget || !window.app) {
+            console.log('[ColDrag] Aborted: dragging=' + dragging + ' dropTarget=' + dropTarget + ' app=' + !!window.app);
+            return;
+          }
+
+          if (dropTarget.key === dragColKey) {
+            console.log('[ColDrag] Dropped on self, no change');
+            return;
+          }
+
+          const isTimeline = !!table.closest('#timeline-wrap');
+
+          // Build new order by moving dragColKey to dropTarget position
+          let order;
+          if (isTimeline) {
+            const allCols = Array.from(headerRow.children).map(h => h.dataset.field || h.dataset.col);
+            order = allCols.slice();
+          } else {
+            order = app._packetColumnOrder.slice();
+          }
+
+          console.log('[ColDrag] Order before:', order.join(', '));
+          console.log('[ColDrag] Moving:', dragColKey, 'to', dropTarget.before ? 'before' : 'after', dropTarget.key);
+
+          // Remove dragged column from current position
+          const fromIdx = order.indexOf(dragColKey);
+          if (fromIdx < 0) {
+            console.log('[ColDrag] dragColKey not found in order!');
+            return;
+          }
+          order.splice(fromIdx, 1);
+
+          // Insert at new position
+          let toIdx = order.indexOf(dropTarget.key);
+          if (toIdx < 0) {
+            console.log('[ColDrag] dropTarget.key not found in order!');
+            return;
+          }
+          if (!dropTarget.before) toIdx += 1;
+          order.splice(toIdx, 0, dragColKey);
+
+          console.log('[ColDrag] Order after:', order.join(', '));
+
+          // Apply
+          if (isTimeline) {
+            app._tlColumnOrder = order.filter(f => f !== '#' && f !== 'Time' && f !== 'Dir');
+            app._renderTimelineTable();
+          } else {
+            app._packetColumnOrder = order;
+            console.log('[ColDrag] Calling applyFilter with new order:', app._packetColumnOrder.join(', '));
+            app.applyFilter();
+          }
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    });
+  }
+
+  // Init packet table columns
+  const packetTable = document.querySelector('#packet-log table');
+  if (packetTable) {
+    // Wait for first render to get proper widths
+    requestAnimationFrame(() => makeColumnsResizable(packetTable));
+  }
+
+  // For dynamically generated tables (timeline), observe and init
+  const observer = new MutationObserver(() => {
+    const tlTable = document.querySelector('#timeline-wrap table');
+    if (tlTable && !tlTable._colResizeInit) {
+      tlTable._colResizeInit = true;
+      makeColumnsResizable(tlTable);
+    }
+  });
+  const tlWrap = document.getElementById('timeline-wrap');
+  if (tlWrap) observer.observe(tlWrap, { childList: true, subtree: true });
+
+  // Expose for manual re-init
+  window._makeColumnsResizable = makeColumnsResizable;
+})();
+</script>
+</body>
+</html>
