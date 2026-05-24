@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -118,7 +119,8 @@
             letter-spacing: 0.08em;
         }
 
-        input, select {
+        input,
+        select {
             width: 100%;
             padding: 14px 16px;
             background: var(--input-bg);
@@ -130,7 +132,8 @@
             outline: none;
         }
 
-        input:focus, select:focus {
+        input:focus,
+        select:focus {
             border-color: #3b82f6;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
@@ -215,7 +218,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .result {
@@ -231,6 +236,7 @@
                 opacity: 0;
                 transform: translateY(-10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -404,6 +410,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
@@ -426,12 +433,18 @@
             <div class="form-group">
                 <label for="region">Region</label>
                 <select id="region">
-                    <option value="Auto">Auto</option>
-                    <option value="EU">EU</option>
-                    <option value="US">US</option>
-                    <option value="CN">CN</option>
+                    <option value="auto">Auto (api.ecoflow.com for email, api-cn for phone)</option>
+                    <option value="api">api.ecoflow.com (Global / US)</option>
+                    <option value="api-e">api-e.ecoflow.com (Europe)</option>
+                    <option value="api-a">api-a.ecoflow.com (Asia / MEA)</option>
+                    <option value="api-j">api-j.ecoflow.com (Japan)</option>
+                    <option value="api-r">api-r.ecoflow.com (Russia)</option>
+                    <option value="api-cn">api-cn.ecoflow.com (China - phone number only)</option>
                 </select>
-                <p class="field-hint">CN region requires a phone number (with country code, e.g. +86...) instead of an email. In Auto mode, entering a phone number automatically routes to the CN region.</p>
+                <p class="field-hint">api-cn requires a phone number (with country code, e.g. +86...) instead of an
+                    email. In Auto mode, entering a phone number automatically routes to api-cn. Your account may live
+                    on a different host than your actual geographic region, so if you receive an "Account does not
+                    exist" message, try selecting the host explicitly.</p>
             </div>
 
             <button type="submit" id="loginBtn">
@@ -447,14 +460,25 @@
 
         <div class="security-notice">
             <div class="security-notice-title">Security & Privacy</div>
-            <p><strong>All requests are made directly from your browser</strong> to EcoFlow's official API servers (<code>api.ecoflow.com</code>, <code>api-e.ecoflow.com</code>, <code>api-a.ecoflow.com</code>, <code>api-cn.ecoflow.com</code>).</p>
-            <p class="security-highlight">️<strong> Your credentials are NEVER sent to any third-party servers or stored anywhere</strong> - they go only to EcoFlow's official authentication endpoints. This page makes direct API calls from your browser.</p>
-            <p class="security-review">It is recommended you review the source code yourself (right-click → View Page Source or <a href="https://github.com/GnoX/gnox.github.io/blob/main/user_id.html#L481" target="_blank" rel="noopener noreferrer">view on GitHub</a>) to verify this implementation.</p>
+            <p><strong>All requests are made directly from your browser</strong> to EcoFlow's official API servers
+                (<code>api.ecoflow.com</code>, <code>api-e.ecoflow.com</code>, <code>api-a.ecoflow.com</code>,
+                <code>api-j.ecoflow.com</code>, <code>api-r.ecoflow.com</code>,
+                <code>api-cn.ecoflow.com</code>).
+            </p>
+            <p class="security-highlight">️<strong> Your credentials are NEVER sent to any third-party servers or stored
+                    anywhere</strong> - they go only to EcoFlow's official authentication endpoints. This page makes
+                direct API calls from your browser.</p>
+            <p class="security-review">It is recommended you review the source code yourself (right-click → View Page
+                Source or <a href="https://github.com/GnoX/gnox.github.io/blob/main/user_id.html#L484" target="_blank"
+                    rel="noopener noreferrer">view on GitHub</a>) to verify this implementation.</p>
         </div>
 
         <div class="footer">
             <p class="footer-disclaimer">The author is not affiliated with EcoFlow in any way</p>
-            <p class="footer-credits">Made by <a href="https://github.com/GnoX" target="_blank" rel="noopener noreferrer">GnoX</a> as a supplement to the <a href="https://github.com/rabits/ha-ef-ble" target="_blank" rel="noopener noreferrer">ha-ef-ble</a> integration</p>
+            <p class="footer-credits">Made by <a href="https://github.com/GnoX" target="_blank"
+                    rel="noopener noreferrer">GnoX</a> as a supplement to the <a
+                    href="https://github.com/rabits/ha-ef-ble" target="_blank" rel="noopener noreferrer">ha-ef-ble</a>
+                integration</p>
         </div>
     </div>
 
@@ -495,20 +519,18 @@
         async function ecoflowLogin(identifier, password, region) {
             const isPhone = isPhoneIdentifier(identifier);
 
-            let baseUrl;
-            switch (region) {
-                case 'EU': baseUrl = 'api-e.ecoflow.com'; break;
-                case 'US': baseUrl = 'api-a.ecoflow.com'; break;
-                case 'CN': baseUrl = 'api-cn.ecoflow.com'; break;
-                default: baseUrl = isPhone ? 'api-cn.ecoflow.com' : 'api.ecoflow.com';
+            if (region === 'auto') {
+                region = isPhone ? 'api-cn' : 'api';
             }
 
-            if (region === 'CN' && !isPhone) {
+            if (region === 'api-cn' && !isPhone) {
                 return {
                     success: false,
-                    error: 'CN region requires phone number, not email'
+                    error: 'api-cn requires phone number, not email'
                 };
             }
+
+            const baseUrl = `${region}.ecoflow.com`;
 
             const encodedPassword = btoa(password);
 
@@ -522,7 +544,7 @@
                 userType: 'ECOFLOW'
             };
 
-            if (region !== 'EU' && region !== 'US' && isPhone) {
+            if (region === 'api-cn' && isPhone) {
                 payload.phone = identifier.replace(/^\+86/, '');
             } else {
                 payload.email = identifier;
@@ -585,6 +607,7 @@
 
         // Real-time identifier validation
         const emailInput = document.getElementById('email');
+        const regionSelect = document.getElementById('region');
         emailInput.addEventListener('input', () => {
             const value = emailInput.value.trim();
 
@@ -598,6 +621,10 @@
                 } else {
                     emailInput.classList.add('invalid');
                 }
+            }
+
+            if (value.startsWith('+86') && regionSelect.value !== 'auto' && regionSelect.value !== 'api-cn') {
+                regionSelect.value = 'api-cn';
             }
         });
 
@@ -658,4 +685,5 @@
         });
     </script>
 </body>
+
 </html>
